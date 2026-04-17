@@ -2,7 +2,7 @@
 
 # =================================================================
 # GREENMIND AI CCTV - HỆ THỐNG GIÁM SÁT THÔNG MINH
-# 🛠️ Coded by Joseph | ✨ UX/UI by "Gái" AI
+# 🛠️ Coded by Joseph | ✨ UX & Security Patched by "Gái" AI
 # =================================================================
 
 export GREEN='\033[0;32m'
@@ -16,53 +16,7 @@ export BOLD='\033[1m'
 TOTAL_STEPS=5
 CURRENT_STEP=0
 
-# --- 🌀 1. Hàm Process "Chữ nổi" Hiện Đại (Braille Spinner) ---
-run_with_process() {
-    local text=$1
-    shift
-    local cmd="$@"
-    
-    # Chạy lệnh ngầm
-    eval "$cmd" > /dev/null 2>&1 &
-    local pid=$!
-    
-    # Hiệu ứng xoay kiểu mượt mà của NPM
-    local spinstr='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
-    while kill -0 $pid 2>/dev/null; do
-        local temp=${spinstr#?}
-        printf "\r${CYAN} %c ${NC} ${text}... " "$spinstr"
-        local spinstr=$temp${spinstr%"$temp"}
-        sleep 0.1
-    done
-    # Cập nhật thành công
-    printf "\r${GREEN} [✓] ${NC} ${text} (Hoàn tất) \033[K\n"
-}
-
-# --- 🛡️ 2. Màn Hình Chào Mừng (Welcome Screen) ---
-show_intro() {
-    clear
-    echo -e "${GREEN}${BOLD}"
-    echo "   ____                      __  __ _           _ "
-    echo "  / ___|_ __ ___  ___ _ __  |  \/  (_)_ __   __| |"
-    echo " | |  _| '__/ _ \/ _ \ '_ \ | |\/| | | '_ \ / _' |"
-    echo " | |_| | | |  __/  __/ | | || |  | | | | | | (_| |"
-    echo "  \____|_|  \___|\___|_| |_||_|  |_|_|_| |_|\__,_|"
-    echo -e "${NC}"
-    echo -e "${YELLOW}🌟 CHÀO MỪNG ĐẾN VỚI TRÌNH CÀI ĐẶT GREENMIND AI${NC}"
-    echo -e "Hệ thống sẽ tiến hành cài đặt các module an toàn sau:"
-    echo -e "  ${BLUE}1.${NC} 📦 Thư viện lõi (Python 3, Node.js, FFMpeg)"
-    echo -e "  ${BLUE}2.${NC} 🐍 Môi trường ảo (VENV) - Đảm bảo không xung đột máy khách"
-    echo -e "  ${BLUE}3.${NC} 🤖 AI Engine (Tùy chọn Local Ollama hoặc Cloud API)"
-    echo -e "  ${BLUE}4.${NC} ⚙️ Thiết lập bảo mật & Cấu hình Camera"
-    echo -e "  ${BLUE}5.${NC} 🚀 Đăng ký Service chạy ngầm tự động"
-    echo ""
-    echo -e "${RED}⚠️ Yêu cầu: Đảm bảo máy có kết nối Internet.${NC}"
-    echo ""
-    # Chờ xác nhận từ người dùng
-    read -p "👉 Zai đã sẵn sàng chưa? (Nhấn ENTER để bắt đầu, CTRL+C để hủy bỏ)... "
-    echo ""
-}
-
+# --- 🛡️ 1. Khởi tạo Biến Môi trường Hệ thống ---
 check_env() {
     if [[ $EUID -ne 0 ]]; then
        echo -e "${RED}❌ Lỗi: Cần chạy bằng lệnh 'sudo bash' nà!${NC}"
@@ -72,22 +26,63 @@ check_env() {
     ARCH_TYPE=$(uname -m)
 }
 
-# --- 📦 3. Cài đặt Core ---
+# --- 🌀 2. Hàm Process (KHÔNG DÙNG EVAL - BẢO MẬT 100%) ---
+run_with_process() {
+    local text=$1
+    shift
+    
+    # Chạy lệnh ngầm thông qua việc truyền trực tiếp Arguments "$@"
+    "$@" > /dev/null 2>&1 &
+    local pid=$!
+    
+    # Hiệu ứng xoay kiểu Braille
+    local spinstr='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
+    while kill -0 $pid 2>/dev/null; do
+        local temp=${spinstr#?}
+        printf "\r${CYAN} %c ${NC} ${text}... " "$spinstr"
+        local spinstr=$temp${spinstr%"$temp"}
+        sleep 0.1
+    done
+    printf "\r${GREEN} [✓] ${NC} ${text} (Hoàn tất) \033[K\n"
+}
+
+# --- 📺 3. Màn Hình Chào Mừng ---
+show_intro() {
+    clear
+    echo -e "${GREEN}${BOLD}"
+    echo "   ____                      __  __ _           _ "
+    echo "  / ___|_ __ ___  ___ _ __  |  \/  (_)_ __   __| |"
+    echo " | |  _| '__/ _ \/ _ \ '_ \ | |\/| | | '_ \ / _' |"
+    echo " | |_| | | |  __/  __/ | | || |  | | | | | | (_| |"
+    echo "  \____|_|  \___|\___|_| |_||_|  |_|_|_| |_|\__,_|"
+    echo -e "${NC}"
+    echo -e "${YELLOW}🌟 CHÀO MỪNG ĐẾN VỚI TRÌNH CÀI ĐẶT GREENMIND AI (v3.1)${NC}"
+    echo -e "  ${BLUE}1.${NC} 📦 Thư viện lõi (Python 3, Node.js, FFMpeg)"
+    echo -e "  ${BLUE}2.${NC} 🐍 Môi trường ảo (VENV) An toàn"
+    echo -e "  ${BLUE}3.${NC} 🤖 AI Engine (Tùy chọn Local Ollama hoặc Cloud API)"
+    echo -e "  ${BLUE}4.${NC} ⚙️ Thiết lập bảo mật & Cấu hình Camera"
+    echo -e "  ${BLUE}5.${NC} 🚀 Đăng ký Service chạy ngầm tự động"
+    echo ""
+    read -p "👉 Zai đã sẵn sàng chưa? (Nhấn ENTER để bắt đầu)... "
+    echo ""
+}
+
+# --- 📦 4. Cài đặt Core ---
 setup_core() {
     ((CURRENT_STEP++))
     echo -e "\n${BOLD}${YELLOW}[$CURRENT_STEP/$TOTAL_STEPS] CHUẨN BỊ NỀN TẢNG HỆ THỐNG${NC}"
     if [[ "$OS_TYPE" == "Linux" ]]; then
-        run_with_process "Cập nhật danh sách gói (apt update)" "apt-get update -y"
-        run_with_process "Cài đặt thư viện hệ thống" "apt-get install -y python3-venv python3-pip curl git nodejs npm ffmpeg libsm6 libxext6"
+        run_with_process "Cập nhật danh sách gói (apt update)" apt-get update -y
+        run_with_process "Cài đặt thư viện hệ thống" apt-get install -y python3-venv python3-pip curl git nodejs npm ffmpeg libsm6 libxext6
     elif [[ "$OS_TYPE" == "Darwin" ]]; then
         if ! command -v brew &> /dev/null; then
-            run_with_process "Cài đặt Homebrew cho Mac" "/bin/bash -c \"\$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\""
+            run_with_process "Cài đặt Homebrew cho Mac" bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
         fi
-        run_with_process "Cài đặt gói Brew (Python, Node, FFMpeg)" "brew install python node ffmpeg"
+        run_with_process "Cài đặt gói Brew (Python, Node, FFMpeg)" brew install python node ffmpeg
     fi
 }
 
-# --- 🐍 4. Thiết lập VENV ---
+# --- 🐍 5. Thiết lập VENV ---
 setup_venv() {
     ((CURRENT_STEP++))
     echo -e "\n${BOLD}${YELLOW}[$CURRENT_STEP/$TOTAL_STEPS] THIẾT LẬP MÔI TRƯỜNG VENV${NC}"
@@ -96,19 +91,25 @@ setup_venv() {
     
     mkdir -p "$GREENMIND_DIR"
     if [ ! -d "$VENV_PATH" ]; then
-        run_with_process "Tạo lồng ấp Python (Virtual Env)" "python3 -m venv $VENV_PATH"
+        run_with_process "Tạo lồng ấp Python (Virtual Env)" python3 -m venv "$VENV_PATH"
     fi
     
-    run_with_process "Nâng cấp công cụ PIP" "$VENV_PATH/bin/pip install --upgrade pip"
-    run_with_process "Tải não bộ AI (OpenCV, Numpy, Gemini, Ezviz)" "$VENV_PATH/bin/pip install opencv-python numpy requests google-generativeai paho-mqtt ezviz-python"
+    run_with_process "Nâng cấp công cụ PIP" "$VENV_PATH/bin/pip" install --upgrade pip
+    run_with_process "Tải não bộ AI (OpenCV, Gemini, Ezviz...)" "$VENV_PATH/bin/pip" install opencv-python numpy requests google-generativeai paho-mqtt ezviz-python
 }
 
-# --- 🤖 5. Cài đặt AI Engines (Menu Gemma 4) ---
+# --- 🤖 6. Cài đặt AI Engines ---
 setup_ai_engines() {
     ((CURRENT_STEP++))
     echo -e "\n${BOLD}${YELLOW}[$CURRENT_STEP/$TOTAL_STEPS] CẤU HÌNH TRÍ TUỆ NHÂN TẠO${NC}"
     
-    TOTAL_RAM=$(free -m | awk '/^Mem:/{print $2}')
+    # 🔴 FIX LỖI MAC MINI: Dùng sysctl cho Darwin và free -m cho Linux
+    if [[ "$OS_TYPE" == "Linux" ]]; then
+        TOTAL_RAM=$(free -m | awk '/^Mem:/{print $2}')
+    elif [[ "$OS_TYPE" == "Darwin" ]]; then
+        TOTAL_RAM=$(($(sysctl -n hw.memsize) / 1024 / 1024))
+    fi
+    
     export LOCAL_MODEL="gemini"
     
     if [ "$TOTAL_RAM" -lt 4000 ]; then
@@ -116,7 +117,7 @@ setup_ai_engines() {
     else
         echo -e "ℹ️ RAM đáp ứng tốt ($TOTAL_RAM MB), chuẩn bị cài đặt Local AI..."
         if ! command -v ollama &> /dev/null; then
-            run_with_process "Đang cài đặt lõi Ollama" "curl -fsSL https://ollama.com/install.sh | sh"
+            run_with_process "Đang cài đặt lõi Ollama" bash -c "curl -fsSL https://ollama.com/install.sh | sh"
         fi
         
         if command -v systemctl &> /dev/null; then
@@ -134,15 +135,15 @@ setup_ai_engines() {
         
         case $model_choice in
             1)
-                run_with_process "Đang kéo model Gemma 4 (2B)" "ollama pull gemma:2b"
+                run_with_process "Đang kéo model Gemma 4 (2B)" ollama pull gemma:2b
                 export LOCAL_MODEL="gemma:2b"
                 ;;
             2)
-                run_with_process "Đang kéo model Gemma 4 (7B)" "ollama pull gemma:7b"
+                run_with_process "Đang kéo model Gemma 4 (7B)" ollama pull gemma:7b
                 export LOCAL_MODEL="gemma:7b"
                 ;;
             3)
-                run_with_process "Đang kéo model Gemma 4 (27B)" "ollama pull gemma:27b"
+                run_with_process "Đang kéo model Gemma 4 (27B)" ollama pull gemma:27b
                 export LOCAL_MODEL="gemma:27b"
                 ;;
             *)
@@ -152,7 +153,7 @@ setup_ai_engines() {
     fi
 }
 
-# --- ⚙️ 6. Cấu hình Camera ---
+# --- ⚙️ 7. Cấu hình Camera ---
 setup_config() {
     ((CURRENT_STEP++))
     echo -e "\n${BOLD}${YELLOW}[$CURRENT_STEP/$TOTAL_STEPS] GHI CẤU HÌNH HỆ THỐNG${NC}"
@@ -173,7 +174,7 @@ EOF
     fi
 }
 
-# --- 🛠️ 7. Thiết lập Service ---
+# --- 🛠️ 8. Thiết lập Service ---
 setup_service() {
     ((CURRENT_STEP++))
     echo -e "\n${BOLD}${YELLOW}[$CURRENT_STEP/$TOTAL_STEPS] ĐĂNG KÝ CHẠY NGẦM${NC}"
@@ -192,7 +193,7 @@ EnvironmentFile=/etc/greenmind/config.env
 [Install]
 WantedBy=multi-user.target
 EOF
-        run_with_process "Nạp cấu hình Service" "systemctl daemon-reload && systemctl enable greenmind"
+        run_with_process "Nạp cấu hình Service" bash -c "systemctl daemon-reload && systemctl enable greenmind"
     else
         echo -e "${GREEN} [✓] Máy Mac, có thể chạy thủ công qua tmux nà.${NC}"
     fi
