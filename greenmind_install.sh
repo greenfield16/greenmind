@@ -14,8 +14,9 @@ export CYAN='\033[0;36m'
 export NC='\033[0m'
 export BOLD='\033[1m'
 
-TOTAL_STEPS=5
+TOTAL_STEPS=6
 CURRENT_STEP=0
+NODE_ROLE="gateway"  # gateway | node
 
 # --- 🛡️ 1. Khởi tạo Biến Môi trường Hệ thống ---
 check_env() {
@@ -68,6 +69,33 @@ show_intro() {
     echo ""
 }
 
+
+# --- 🖥️ CHỌN VAI TRÒ MÁY ---
+select_node_role() {
+    ((CURRENT_STEP++))
+    echo -e "\n${BOLD}${YELLOW}[$CURRENT_STEP/$TOTAL_STEPS] VAI TRÒ CỦA MÁY NÀY${NC}"
+    echo ""
+    echo -e "  ${BLUE}1)${NC} 🌐 Gateway  — Não chính: cài đầy đủ AI, kết nối Telegram/WhatsApp"
+    echo -e "               Phù hợp: Mac Mini, VPS, PC"
+    echo -e "  ${BLUE}2)${NC} 📡 Node     — Tai mắt: cài nhẹ, chuyên camera/cảm biến/relay"
+    echo -e "               Phù hợp: Tinkerboard, Raspberry Pi, máy yếu"
+    echo ""
+    read -p "👉 Chọn vai trò (1/2, mặc định 1): " role_choice
+    case "$role_choice" in
+        2)
+            NODE_ROLE="node"
+            echo -e "${GREEN} [✓] Chế độ NODE — Sẽ bỏ qua cài AI Engine nặng.${NC}"
+            read -p "Nhập IP/Domain của Gateway (VD: 192.168.1.100 hoặc myhome.ddns.net): " GATEWAY_ADDR
+            read -p "Nhập Pairing Token từ Gateway: " GATEWAY_TOKEN
+            ;;
+        *)
+            NODE_ROLE="gateway"
+            echo -e "${GREEN} [✓] Chế độ GATEWAY — Cài đầy đủ.${NC}"
+            ;;
+    esac
+    echo ""
+}
+
 # --- 📦 4. Cài đặt Core ---
 setup_core() {
     ((CURRENT_STEP++))
@@ -103,6 +131,10 @@ setup_venv() {
 setup_ai_engines() {
     ((CURRENT_STEP++))
     echo -e "\n${BOLD}${YELLOW}[$CURRENT_STEP/$TOTAL_STEPS] CẤU HÌNH TRÍ TUỆ NHÂN TẠO${NC}"
+    if [[ "$NODE_ROLE" == "node" ]]; then
+        echo -e "${YELLOW}⏭ Chế độ Node — Bỏ qua cài AI Engine.${NC}"
+        return 0
+    fi
     
     # 🔴 FIX LỖI MAC MINI: Dùng sysctl cho Darwin và free -m cho Linux
     if [[ "$OS_TYPE" == "Linux" ]]; then
@@ -265,11 +297,25 @@ EOF
 # --- 🏁 CHẠY TỔNG LỰC ---
 check_env
 show_intro
+select_node_role
 setup_core
 setup_venv
 setup_ai_engines
 setup_config
 setup_service
 
+# --- Kết nối Node về Gateway ---
+if [[ "$NODE_ROLE" == "node" ]]; then
+    echo -e "\n${BOLD}${CYAN}🔗 KẾT NỐI NODE VỀ GATEWAY${NC}"
+    openclaw connect --gateway "$GATEWAY_ADDR" --token "$GATEWAY_TOKEN" 2>/dev/null && \
+        echo -e "${GREEN} [✓] Đã kết nối thành công về $GATEWAY_ADDR${NC}" || \
+        echo -e "${YELLOW} [!] Chạy thủ công: openclaw connect --gateway $GATEWAY_ADDR --token $GATEWAY_TOKEN${NC}"
+fi
+
 echo -e "\n${GREEN}${BOLD}🎉 CÀI ĐẶT THÀNH CÔNG RỰC RỠ!${NC}"
+if [[ "$NODE_ROLE" == "gateway" ]]; then
+    echo -e "${CYAN}Gateway sẵn sàng. Lấy token cho các node: openclaw gateway token${NC}"
+else
+    echo -e "${CYAN}Node đã kết nối về Gateway: $GATEWAY_ADDR${NC}"
+fi
 echo -e "${CYAN}Kiểm tra file cấu hình tại: /etc/greenmind/config.env${NC}"
