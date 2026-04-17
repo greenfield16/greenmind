@@ -1,8 +1,9 @@
 #!/bin/bash
 
 # =================================================================
-# GREENMIND AI CCTV - HỆ THỐNG GIÁM SÁT THÔNG MINH
-# 🛠️ Coded by Joseph | ✨ UX & Security Patched by "Gái" AI
+# 🌿 GREENMIND — AI-Powered Home Surveillance
+#    "Ngôi nhà biết nhìn, biết nghĩ, biết bảo vệ"
+# 🛠 1 sản phẩm của Greenfield Tech.  |  🤖 AI-crafted by Mary
 # =================================================================
 
 export GREEN='\033[0;32m'
