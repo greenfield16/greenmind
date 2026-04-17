@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Greenmind Installer - Ngoi nha biet nhin
+# Supports: Linux (x86_64, arm64, armv7l) + macOS (Apple Silicon + Intel Mac)
 set -euo pipefail
 
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
@@ -11,6 +12,8 @@ LOG_FILE="/var/log/greenmind_install.log"
 INSTALLED_MODULES=()
 AI_MODE="api"
 NODE_ROLE="gateway"
+OS_TYPE=""
+ARCH=""
 
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" >> "$LOG_FILE"; }
 info() { echo -e "${CYAN}[INFO]${NC} $*"; log "INFO: $*"; }
@@ -31,7 +34,11 @@ echo "${ans:-$default}"
 }
 
 save_config() {
+if [[ "$OS_TYPE" == "macos" ]]; then
+sed -i '' "/^${1}=/d" "$CONFIG_FILE" 2>/dev/null || true
+else
 sed -i "/^${1}=/d" "$CONFIG_FILE" 2>/dev/null || true
+fi
 echo "${1}=${2}" >> "$CONFIG_FILE"
 }
 
@@ -53,19 +60,35 @@ info "Bat dau cai dat luc $(date)"
 detect_hardware() {
 header "Buoc 1: Phat hien phan cung"
 ARCH=$(uname -m)
+# Normalize arm64 on macOS vs aarch64 on Linux
+[[ "$ARCH" == "arm64" ]] && ARCH="arm64"
+[[ "$ARCH" == "aarch64" ]] && ARCH="arm64"
+# Detect OS
+if [[ "$(uname -s)" == "Darwin" ]]; then
+OS_TYPE="macos"
+CPU_MODEL=$(sysctl -n machdep.cpu.brand_string 2>/dev/null || echo "Apple Silicon")
+CPU_CORES=$(sysctl -n hw.logicalcpu)
+RAM_GB=$(( $(sysctl -n hw.memsize) / 1024 / 1024 / 1024 ))
+OS_ID="macos $(sw_vers -productVersion 2>/dev/null || echo '')"
+else
+OS_TYPE="linux"
 CPU_MODEL=$(grep 'model name' /proc/cpuinfo 2>/dev/null | head -1 | cut -d: -f2 | xargs || echo "Unknown")
 CPU_CORES=$(nproc)
 RAM_GB=$(awk '/MemTotal/{printf "%d", $2/1024/1024}' /proc/meminfo)
 OS_ID=$(grep '^ID=' /etc/os-release 2>/dev/null | cut -d= -f2 | tr -d '"' || echo "linux")
+fi
 echo " CPU : $CPU_MODEL ($CPU_CORES cores)"
 echo " RAM : ${RAM_GB} GB"
 echo " ARCH : $ARCH"
-echo " OS : $OS_ID"
+echo " OS : $OS_TYPE ($OS_ID)"
 GPU_VRAM=0
 if command -v nvidia-smi &>/dev/null; then
 GPU_VRAM=$(nvidia-smi --query-gpu=memory.total --format=csv,noheader,nounits 2>/dev/null | head -1 | awk '{printf "%d",$1/1024}' || echo 0)
 GPU_NAME=$(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | head -1 || echo "NVIDIA")
 echo " GPU : $GPU_NAME (${GPU_VRAM} GB VRAM)"
+elif [[ "$OS_TYPE" == "macos" ]]; then
+GPU_NAME=$(system_profiler SPDisplaysDataType 2>/dev/null | awk '/Chipset Model/{print $3,$4,$5; exit}' || echo "Integrated")
+echo " GPU : $GPU_NAME (Apple Unified Memory)"
 else
 echo " GPU : Khong co GPU roi"
 fi
@@ -88,14 +111,54 @@ save_config "AI_MODE" "$AI_MODE"
 success "Che do AI: $AI_MODE"
 }
 
+ensure_brew() {
+if ! command -v brew &>/dev/null; then
+info "Cai Homebrew..."
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+if [[ -f /opt/homebrew/bin/brew ]]; then
+eval "$(/opt/homebrew/bin/brew shellenv)"
+echo 'eval "$(/opt/homebrew/bin/brew shellenv)"' >> ~/.zprofile
+elif [[ -f /usr/local/bin/brew ]]; then
+eval "$(/usr/local/bin/brew shellenv)"
+fi
+fi
+}
+
+pkg_install() {
+if [[ "$OS_TYPE" == "macos" ]]; then
+ensure_brew
+for pkg in "$@"; do
+brew list "$pkg" &>/dev/null || brew install "$pkg" 2>/dev/null || warn "Khong cai duoc: $pkg"
+done
+else
+apt-get install -y -q "$@"
+fi
+}
+
+service_enable() {
+local name="$1" plist_path="${2:-}"
+if [[ "$OS_TYPE" == "macos" ]]; then
+[[ -n "$plist_path" && -f "$plist_path" ]] && launchctl load -w "$plist_path" 2>/dev/null || true
+else
+systemctl daemon-reload
+systemctl enable "$name" 2>/dev/null || true
+systemctl start "$name" 2>/dev/null || true
+fi
+}
+
+
 install_openclaw() {
 header "Buoc 2: Cai dat OpenClaw"
 if ! command -v node &>/dev/null || [[ $(node -v 2>/dev/null | cut -d. -f1 | tr -d 'v') -lt 22 ]]; then
 info "Cai Node.js v22..."
-if [[ "$ARCH" == "x86_64" ]]; then
+if [[ "$OS_TYPE" == "macos" ]]; then
+ensure_brew
+brew install node@22 2>/dev/null || brew upgrade node@22 2>/dev/null || true
+brew link --overwrite --force node@22 2>/dev/null || true
+elif [[ "$ARCH" == "x86_64" ]]; then
 curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
 apt-get install -y nodejs
-elif [[ "$ARCH" == "aarch64" ]]; then
+elif [[ "$ARCH" == "arm64" ]]; then
 curl -fsSL "https://nodejs.org/dist/v22.15.0/node-v22.15.0-linux-arm64.tar.xz" | tar -xJ -C /usr/local --strip-components=1
 elif [[ "$ARCH" == "armv7l" ]]; then
 curl -fsSL "https://nodejs.org/dist/v22.15.0/node-v22.15.0-linux-armv7l.tar.xz" | tar -xJ -C /usr/local --strip-components=1
@@ -123,8 +186,12 @@ choice=$(ask "Lua chon" "1")
 if [[ "$choice" == "1" ]]; then
 NODE_ROLE="gateway"
 openclaw gateway start 2>/dev/null || true
+if [[ "$OS_TYPE" == "macos" ]]; then
+brew services start openclaw-gateway 2>/dev/null || launchctl load /Library/LaunchDaemons/ai.openclaw.gateway.plist 2>/dev/null || true
+else
 systemctl enable openclaw-gateway 2>/dev/null || true
 systemctl start openclaw-gateway 2>/dev/null || true
+fi
 success "Gateway dang chay"
 info "Token cho child nodes:"
 openclaw gateway token 2>/dev/null || warn "Chay 'openclaw gateway token' de lay token"
@@ -150,10 +217,18 @@ header "Buoc 4: Cai dat AI"
 if [[ "$AI_MODE" == "local" ]]; then
 if ! command -v ollama &>/dev/null; then
 info "Cai Ollama..."
+if [[ "$OS_TYPE" == "macos" ]]; then
+ensure_brew; brew install ollama
+else
 curl -fsSL https://ollama.ai/install.sh | sh
 fi
+fi
+if [[ "$OS_TYPE" == "macos" ]]; then
+brew services start ollama 2>/dev/null || true
+else
 systemctl enable ollama 2>/dev/null || true
 systemctl start ollama 2>/dev/null || true
+fi
 info "Tai Gemma 4 model..."
 ollama pull gemma3:4b
 save_config "OLLAMA_URL" "http://localhost:11434"
@@ -177,8 +252,8 @@ fi
 
 install_ezviz_camera() {
 header " Camera Ezviz"
-apt-get install -y python3-pip -q 2>/dev/null || true
-pip3 install pyezviz requests --break-system-packages -q
+pkg_install python3-pip 2>/dev/null || true
+pip3 install pyezviz requests --break-system-packages -q 2>/dev/null || pip3 install pyezviz requests -q
 local phone pass region serial
 phone=$(ask "So dien thoai Ezviz")
 pass=$(ask "Mat khau Ezviz")
@@ -267,6 +342,20 @@ time.sleep(POLL_INTERVAL)
 if __name__ == '__main__': main()
 FALLEOF
 
+if [[ "$OS_TYPE" == "macos" ]]; then
+cat > /Library/LaunchDaemons/ai.greenmind.camera.plist << 'PLISTEOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>Label</key><string>ai.greenmind.camera</string>
+  <key>ProgramArguments</key><array><string>/usr/bin/python3</string><string>/opt/greenmind/fall_detector.py</string></array>
+  <key>RunAtLoad</key><true/><key>KeepAlive</key><true/>
+  <key>StandardOutPath</key><string>/var/log/fall_detector.log</string>
+  <key>StandardErrorPath</key><string>/var/log/fall_detector.log</string>
+</dict></plist>
+PLISTEOF
+launchctl load -w /Library/LaunchDaemons/ai.greenmind.camera.plist
+else
 cat > /etc/systemd/system/greenmind-camera.service << 'SVCEOF'
 [Unit]
 Description=Greenmind Camera Fall Detector
@@ -279,18 +368,29 @@ RestartSec=10
 WantedBy=multi-user.target
 SVCEOF
 systemctl daemon-reload && systemctl enable greenmind-camera && systemctl start greenmind-camera
+fi
 INSTALLED_MODULES+=("Camera Ezviz")
 success "Ezviz Camera da cai"
 }
 
 install_tts_speaker() {
 header " TTS Speaker"
+if [[ "$OS_TYPE" == "macos" ]]; then
+pkg_install python3 ffmpeg
+pip3 install gtts -q 2>/dev/null || pip3 install gtts --break-system-packages -q
+else
 apt-get install -y python3-pip ffmpeg mpg123 bluez pulseaudio pulseaudio-module-bluetooth alsa-utils -q
 pip3 install gtts --break-system-packages -q
+fi
 echo " [1] 3.5mm jack [2] Bluetooth"
 local audio_type
 audio_type=$(ask "Loai audio" "1")
 if [[ "$audio_type" == "2" ]]; then
+if [[ "$OS_TYPE" == "macos" ]]; then
+warn "macOS: Ket noi Bluetooth qua System Settings > Bluetooth"
+bt_mac=$(ask "MAC address loa Bluetooth (tuy chon)")
+[[ -n "$bt_mac" ]] && save_config "BT_SPEAKER_MAC" "$bt_mac"
+else
 info "Scan Bluetooth 10 giay..."
 systemctl start bluetooth 2>/dev/null || true
 bluetoothctl power on 2>/dev/null || true
@@ -304,6 +404,7 @@ pulseaudio --start 2>/dev/null || true; sleep 2
 bluetoothctl connect "$bt_mac" 2>/dev/null || true
 save_config "BT_SPEAKER_MAC" "$bt_mac"
 fi
+fi
 cat > "$GREENMIND_DIR/tts_speak.py" << 'TTSEOF'
 #!/usr/bin/env python3
 import sys, subprocess, tempfile, os
@@ -315,7 +416,9 @@ wav = tmp_mp3.replace('.mp3', '.wav')
 gTTS(text, lang=lang).save(tmp_mp3)
 subprocess.run(['ffmpeg','-y','-i',tmp_mp3,'-ar','44100','-ac','2',wav],
 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-subprocess.run(['paplay', wav])
+import platform
+player = 'afplay' if platform.system() == 'Darwin' else 'paplay'
+subprocess.run([player, wav])
 os.unlink(tmp_mp3); os.unlink(wav)
 
 if __name__ == '__main__':
@@ -329,6 +432,11 @@ success "TTS Speaker da cai"
 
 install_dht_sensor() {
 header " DHT Sensor"
+if [[ "$OS_TYPE" == "macos" ]]; then
+warn "DHT Sensor yeu cau Linux/Raspberry Pi/Tinkerboard. Bo qua tren macOS."
+INSTALLED_MODULES+=("DHT Sensor [SKIPPED - macOS]")
+return 0
+fi
 apt-get install -y python3-pip python3-dev libgpiod2 -q
 pip3 install adafruit-circuitpython-dht --break-system-packages -q
 echo " [1] DHT11 [2] DHT22"
@@ -366,12 +474,18 @@ RestartSec=30
 WantedBy=multi-user.target
 SVCEOF
 systemctl daemon-reload && systemctl enable greenmind-dht && systemctl start greenmind-dht
+# (macOS skipped above via early return)
 INSTALLED_MODULES+=("DHT Sensor")
 success "DHT Sensor da cai"
 }
 
 install_relay_control() {
 header " Relay Control"
+if [[ "$OS_TYPE" == "macos" ]]; then
+warn "Relay Control yeu cau Linux/Raspberry Pi/Tinkerboard. Bo qua tren macOS."
+INSTALLED_MODULES+=("Relay Control [SKIPPED - macOS]")
+return 0
+fi
 apt-get install -y python3-gpiozero -q
 local num_relays
 num_relays=$(ask "So relay" "2")
@@ -436,7 +550,11 @@ openclaw channel add whatsapp 2>/dev/null || \
 warn "Xem: openclaw channel info whatsapp"
 success "WhatsApp da bat"
 fi
+if [[ "$OS_TYPE" == "macos" ]]; then
+brew services restart openclaw-gateway 2>/dev/null || true
+else
 systemctl restart openclaw-gateway 2>/dev/null || true
+fi
 INSTALLED_MODULES+=("Messaging Bot")
 success "Messaging Bot da cai"
 }
