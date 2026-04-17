@@ -1,622 +1,209 @@
-#!/usr/bin/env bash
-# Greenmind Installer - Ngoi nha biet nhin
-# Supports: Linux (x86_64, arm64, armv7l) + macOS (Apple Silicon + Intel Mac)
-set -euo pipefail
+#!/bin/bash
 
-RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
-BLUE='\033[0;34m'; CYAN='\033[0;36m'; BOLD='\033[1m'; NC='\033[0m'
-GREENMIND_DIR="/opt/greenmind"
-CONFIG_DIR="/etc/greenmind"
-CONFIG_FILE="$CONFIG_DIR/config.env"
-LOG_FILE="/var/log/greenmind_install.log"
-INSTALLED_MODULES=()
-AI_MODE="api"
-NODE_ROLE="gateway"
-OS_TYPE=""
-ARCH=""
+# =================================================================
+# GREENMIND AI CCTV - HỆ THỐNG GIÁM SÁT THÔNG MINH
+# 🛠️ Coded by Joseph | ✨ Refined by "Gái" AI
+# =================================================================
 
-log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" >> "$LOG_FILE"; }
-info() { echo -e "${CYAN}[INFO]${NC} $*"; log "INFO: $*"; }
-success() { echo -e "${GREEN}[OK]${NC} $*"; log "OK: $*"; }
-warn() { echo -e "${YELLOW}[WARN]${NC} $*"; log "WARN: $*"; }
-error() { echo -e "${RED}[ERROR]${NC} $*"; log "ERROR: $*"; exit 1; }
+# --- 🎨 1. Định nghĩa Màu sắc & UI ---
+export GREEN='\033[0;32m'
+export BLUE='\033[0;34m'
+export YELLOW='\033[1;33m'
+export RED='\033[0;31m'
+export NC='\033[0m'
+export BOLD='\033[1m'
 
-header() {
-echo -e "\n${BOLD}${BLUE}============================================${NC}"
-echo -e "${BOLD}${BLUE} $*${NC}"
-echo -e "${BOLD}${BLUE}============================================${NC}\n"
+# --- 🌀 2. Hàm hiệu ứng Spinner ---
+spinner() {
+    local pid=$1
+    local delay=0.1
+    local spinstr='|/-\'
+    while [ "$(ps a | awk '{print $1}' | grep $pid)" ]; do
+        local temp=${spinstr#?}
+        printf "${BLUE} [%c] Đang xử lý... ${NC}" "$spinstr"
+        local spinstr=$temp${spinstr%"$temp"}
+        sleep $delay
+        printf "\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b"
+    done
+    printf "    \b\b\b\b"
 }
 
-ask() {
-local prompt="$1" default="${2:-}" ans
-[[ -n "$default" ]] && read -rp "? $prompt [$default]: " ans || read -rp "? $prompt: " ans
-echo "${ans:-$default}"
+print_header() {
+    echo -e "${GREEN}${BOLD}
+    ================================================
+    🚀 GREENMIND AI CCTV - GIẢI PHÁP GIÁM SÁT THÔNG MINH
+    Tối ưu cho: Mac Mini | Tinkerboard | Ubuntu VPS
+    ================================================
+    ${NC}"
 }
 
-save_config() {
-if [[ "$OS_TYPE" == "macos" ]]; then
-sed -i '' "/^${1}=/d" "$CONFIG_FILE" 2>/dev/null || true
-else
-sed -i "/^${1}=/d" "$CONFIG_FILE" 2>/dev/null || true
-fi
-echo "${1}=${2}" >> "$CONFIG_FILE"
+# --- 🛡️ 3. Kiểm tra Hệ thống & Phân quyền ---
+check_env() {
+    if [[ $EUID -ne 0 ]]; then
+       echo -e "${RED}❌ Lỗi: Zai phải dùng 'sudo bash' để chạy nà!${NC}"
+       exit 1
+    fi
+    OS_TYPE=$(uname -s)
+    ARCH_TYPE=$(uname -m)
+    echo -e "${BLUE}ℹ️ Detected: $OS_TYPE ($ARCH_TYPE)${NC}"
 }
 
-init() {
-[[ $EUID -ne 0 ]] && error "Can chay voi quyen root: sudo bash $0"
-mkdir -p "$GREENMIND_DIR" "$CONFIG_DIR"
-touch "$LOG_FILE" "$CONFIG_FILE"
-chmod 600 "$CONFIG_FILE"
-clear
-echo -e "${BOLD}${GREEN}"
-echo " +=========================================+"
-echo " | GREENMIND INSTALLER |"
-echo " | Ngoi nha biet nhin |"
-echo " +=========================================+"
-echo -e "${NC}"
-info "Bat dau cai dat luc $(date)"
+# --- 📦 4. Cài đặt Core Dependencies ---
+setup_core() {
+    echo -e "${YELLOW}🔹 Bước 1: Cài đặt nền tảng hệ thống...${NC}"
+    if [[ "$OS_TYPE" == "Linux" ]]; then
+        apt-get update -y > /dev/null 2>&1 & spinner $!
+        apt-get install -y python3-venv python3-pip curl git nodejs npm ffmpeg libsm6 libxext6 > /dev/null 2>&1 & spinner $!
+    elif [[ "$OS_TYPE" == "Darwin" ]]; then
+        if ! command -v brew &> /dev/null; then
+            echo -e "${YELLOW}Cài đặt Homebrew cho Mac...${NC}"
+            /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" > /dev/null 2>&1 & spinner $!
+        fi
+        brew install python node ffmpeg > /dev/null 2>&1 & spinner $!
+    fi
 }
 
-detect_hardware() {
-header "Buoc 1: Phat hien phan cung"
-ARCH=$(uname -m)
-# Normalize arm64 on macOS vs aarch64 on Linux
-[[ "$ARCH" == "arm64" ]] && ARCH="arm64"
-[[ "$ARCH" == "aarch64" ]] && ARCH="arm64"
-# Detect OS
-if [[ "$(uname -s)" == "Darwin" ]]; then
-OS_TYPE="macos"
-CPU_MODEL=$(sysctl -n machdep.cpu.brand_string 2>/dev/null || echo "Apple Silicon")
-CPU_CORES=$(sysctl -n hw.logicalcpu)
-RAM_GB=$(( $(sysctl -n hw.memsize) / 1024 / 1024 / 1024 ))
-OS_ID="macos $(sw_vers -productVersion 2>/dev/null || echo '')"
-else
-OS_TYPE="linux"
-CPU_MODEL=$(grep 'model name' /proc/cpuinfo 2>/dev/null | head -1 | cut -d: -f2 | xargs || echo "Unknown")
-CPU_CORES=$(nproc)
-RAM_GB=$(awk '/MemTotal/{printf "%d", $2/1024/1024}' /proc/meminfo)
-OS_ID=$(grep '^ID=' /etc/os-release 2>/dev/null | cut -d= -f2 | tr -d '"' || echo "linux")
-fi
-echo " CPU : $CPU_MODEL ($CPU_CORES cores)"
-echo " RAM : ${RAM_GB} GB"
-echo " ARCH : $ARCH"
-echo " OS : $OS_TYPE ($OS_ID)"
-GPU_VRAM=0
-if command -v nvidia-smi &>/dev/null; then
-GPU_VRAM=$(nvidia-smi --query-gpu=memory.total --format=csv,noheader,nounits 2>/dev/null | head -1 | awk '{printf "%d",$1/1024}' || echo 0)
-GPU_NAME=$(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | head -1 || echo "NVIDIA")
-echo " GPU : $GPU_NAME (${GPU_VRAM} GB VRAM)"
-elif [[ "$OS_TYPE" == "macos" ]]; then
-GPU_NAME=$(system_profiler SPDisplaysDataType 2>/dev/null | awk '/Chipset Model/{print $3,$4,$5; exit}' || echo "Integrated")
-echo " GPU : $GPU_NAME (Apple Unified Memory)"
-else
-echo " GPU : Khong co GPU roi"
-fi
-echo ""
-if [[ $GPU_VRAM -ge 4 && $RAM_GB -ge 8 ]]; then
-RECOMMENDED_AI="local"
-echo -e "${GREEN}-> Khuyen nghi: AI Local (Gemma 4 via Ollama)${NC}"
-else
-RECOMMENDED_AI="api"
-echo -e "${YELLOW}-> Khuyen nghi: API Mode (Gemini API)${NC}"
-fi
-echo ""
-echo "Chon che do AI:"
-echo " [1] AI Local - Gemma 4 via Ollama (can GPU >=4GB, RAM >=8GB)"
-echo " [2] API Mode - Gemini API (can internet + API key)"
-local choice
-choice=$(ask "Lua chon" "$([[ $RECOMMENDED_AI == local ]] && echo 1 || echo 2)")
-[[ "$choice" == "1" ]] && AI_MODE="local" || AI_MODE="api"
-save_config "AI_MODE" "$AI_MODE"
-success "Che do AI: $AI_MODE"
+# --- 🐍 5. Thiết lập Python Virtual Environment (VENV) ---
+setup_venv() {
+    echo -e "${YELLOW}🔹 Bước 2: Thiết lập môi trường ảo AI (VENV)...${NC}"
+    GREENMIND_DIR="$HOME/.greenmind"
+    VENV_PATH="$GREENMIND_DIR/venv"
+    
+    mkdir -p "$GREENMIND_DIR"
+    if [ ! -d "$VENV_PATH" ]; then
+        python3 -m venv "$VENV_PATH"
+    fi
+    
+    # Cài đặt các thư viện lõi từ bản 400 dòng của Zai
+    echo -e "${BLUE}Đang cài đặt các thư viện AI & Camera...${NC}"
+    "$VENV_PATH/bin/pip" install --upgrade pip > /dev/null 2>&1
+    "$VENV_PATH/bin/pip" install opencv-python numpy requests google-generativeai paho-mqtt ezviz-python > /dev/null 2>&1 & spinner $!
 }
 
-ensure_brew() {
-if ! command -v brew &>/dev/null; then
-info "Cai Homebrew..."
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-if [[ -f /opt/homebrew/bin/brew ]]; then
-eval "$(/opt/homebrew/bin/brew shellenv)"
-echo 'eval "$(/opt/homebrew/bin/brew shellenv)"' >> ~/.zprofile
-elif [[ -f /usr/local/bin/brew ]]; then
-eval "$(/usr/local/bin/brew shellenv)"
-fi
-fi
+# --- 🤖 6. Cài đặt AI Engines (Ollama & Gemma 4 Logic) ---
+setup_ai_engines() {
+    echo -e "${YELLOW}🔹 Bước 3: Cấu hình Não bộ AI (Local & Cloud)...${NC}"
+    
+    TOTAL_RAM=$(free -m | awk '/^Mem:/{print $2}')
+    export LOCAL_MODEL="gemini" # Mặc định nếu khum chọn gì
+    
+    if [ "$TOTAL_RAM" -lt 4000 ]; then
+        echo -e "${BLUE}ℹ️ RAM hệ thống ($TOTAL_RAM MB) quá thấp, tự động chạy Gemini API cho nhẹ máy nà.${NC}"
+    else
+        echo -e "${BLUE}ℹ️ RAM \"Khủng\" ($TOTAL_RAM MB), tiến hành chuẩn bị Ollama Local AI...${NC}"
+        if ! command -v ollama &> /dev/null; then
+            curl -fsSL https://ollama.com/install.sh | sh > /dev/null 2>&1 & spinner $!
+        fi
+        
+        # Đảm bảo Ollama đang chạy ngầm để tải model (Hỗ trợ cả Mac và Linux)
+        if command -v systemctl &> /dev/null; then
+            systemctl start ollama > /dev/null 2>&1
+        else
+            ollama serve > /dev/null 2>&1 &
+        fi
+        
+        echo -e "\n${YELLOW}🧠 ZAI MUỐN CÀI ĐẶT MODEL GEMMA 4 NÀO CHO KHÁCH ĐÂY?${NC}"
+        echo -e "  ${GREEN}1)${NC} Gemma 4 (2B)  - Nhẹ nhất, chạy mượt trên Tinkerboard/4GB RAM"
+        echo -e "  ${GREEN}2)${NC} Gemma 4 (7B)  - Cân bằng, khuyên dùng cho Mac Mini/8GB RAM"
+        echo -e "  ${GREEN}3)${NC} Gemma 4 (27B) - Siêu cấp, chỉ dùng khi có 16GB RAM + VGA rời"
+        echo -e "  ${GREEN}4)${NC} Khum cài bây giờ, tui xài Cloud API"
+        
+        read -p "👉 Lựa chọn của Zai (1-4): " model_choice
+        
+        case $model_choice in
+            1)
+                echo -e "${BLUE}Đang kéo Gemma 4 (2B) về nhà... Zai đợi chút nà!${NC}"
+                ollama pull gemma:2b > /dev/null 2>&1 & spinner $!
+                export LOCAL_MODEL="gemma:2b"
+                ;;
+            2)
+                echo -e "${BLUE}Đang kéo Gemma 4 (7B) về nhà...${NC}"
+                ollama pull gemma:7b > /dev/null 2>&1 & spinner $!
+                export LOCAL_MODEL="gemma:7b"
+                ;;
+            3)
+                echo -e "${BLUE}Đang kéo cỗ xe tăng Gemma 4 (27B) về nhà...${NC}"
+                ollama pull gemma:27b > /dev/null 2>&1 & spinner $!
+                export LOCAL_MODEL="gemma:27b"
+                ;;
+            *)
+                echo -e "${YELLOW}Đã chuyển về chế độ dùng API Cloud nà.${NC}"
+                ;;
+        esac
+    fi
 }
 
-pkg_install() {
-if [[ "$OS_TYPE" == "macos" ]]; then
-ensure_brew
-for pkg in "$@"; do
-brew list "$pkg" &>/dev/null || brew install "$pkg" 2>/dev/null || warn "Khong cai duoc: $pkg"
-done
-else
-apt-get install -y -q "$@"
-fi
+# --- ⚙️ 7. Cấu hình Camera & Hệ thống ---
+setup_config() {
+    echo -e "${YELLOW}🔹 Bước 4: Tạo tệp cấu hình (Lưu Model đã chọn)...${NC}"
+    mkdir -p /etc/greenmind
+    if [ ! -f /etc/greenmind/config.env ]; then
+        cat <<EOF > /etc/greenmind/config.env
+# GREENMIND CONFIGURATION
+AI_ENGINE=$LOCAL_MODEL
+GEMINI_KEY=YOUR_KEY_HERE
+MQTT_BROKER=localhost
+MQTT_PORT=1883
+EZVIZ_USER=admin
+EZVIZ_PASS=password
+EOF
+        chmod 600 /etc/greenmind/config.env
+    fi
 }
 
-service_enable() {
-local name="$1" plist_path="${2:-}"
-if [[ "$OS_TYPE" == "macos" ]]; then
-[[ -n "$plist_path" && -f "$plist_path" ]] && launchctl load -w "$plist_path" 2>/dev/null || true
-else
-systemctl daemon-reload
-systemctl enable "$name" 2>/dev/null || true
-systemctl start "$name" 2>/dev/null || true
-fi
-}
-
-
-install_openclaw() {
-header "Buoc 2: Cai dat OpenClaw"
-if ! command -v node &>/dev/null || [[ $(node -v 2>/dev/null | cut -d. -f1 | tr -d 'v') -lt 22 ]]; then
-info "Cai Node.js v22..."
-if [[ "$OS_TYPE" == "macos" ]]; then
-ensure_brew
-brew install node@22 2>/dev/null || brew upgrade node@22 2>/dev/null || true
-brew link --overwrite --force node@22 2>/dev/null || true
-elif [[ "$ARCH" == "x86_64" ]]; then
-curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
-apt-get install -y nodejs
-elif [[ "$ARCH" == "arm64" ]]; then
-curl -fsSL "https://nodejs.org/dist/v22.15.0/node-v22.15.0-linux-arm64.tar.xz" | tar -xJ -C /usr/local --strip-components=1
-elif [[ "$ARCH" == "armv7l" ]]; then
-curl -fsSL "https://nodejs.org/dist/v22.15.0/node-v22.15.0-linux-armv7l.tar.xz" | tar -xJ -C /usr/local --strip-components=1
-fi
-success "Node.js $(node -v) da cai"
-else
-success "Node.js $(node -v) da co san"
-fi
-if ! command -v openclaw &>/dev/null; then
-info "Cai OpenClaw..."
-[[ "$ARCH" == "armv7l" ]] && npm install -g openclaw --force || npm install -g openclaw
-success "OpenClaw da cai"
-else
-success "OpenClaw da co san"
-fi
-}
-
-configure_node_role() {
-header "Buoc 3: Cau hinh Node"
-echo "Chon vai tro:"
-echo " [1] Gateway (node chinh)"
-echo " [2] Child Node (node phu)"
-local choice
-choice=$(ask "Lua chon" "1")
-if [[ "$choice" == "1" ]]; then
-NODE_ROLE="gateway"
-openclaw gateway start 2>/dev/null || true
-if [[ "$OS_TYPE" == "macos" ]]; then
-brew services start openclaw-gateway 2>/dev/null || launchctl load /Library/LaunchDaemons/ai.openclaw.gateway.plist 2>/dev/null || true
-else
-systemctl enable openclaw-gateway 2>/dev/null || true
-systemctl start openclaw-gateway 2>/dev/null || true
-fi
-success "Gateway dang chay"
-info "Token cho child nodes:"
-openclaw gateway token 2>/dev/null || warn "Chay 'openclaw gateway token' de lay token"
-else
-NODE_ROLE="child"
-echo "Kieu ket noi: [1] Local LAN [2] Internet"
-local conn_type gw_addr gw_token
-conn_type=$(ask "Lua chon" "1")
-[[ "$conn_type" == "1" ]] && \
-gw_addr=$(ask "IP gateway (vi du: 192.168.1.100)") || \
-gw_addr=$(ask "Domain/IP gateway")
-gw_token=$(ask "Pairing token tu gateway")
-openclaw connect --gateway "$gw_addr" --token "$gw_token" 2>/dev/null || \
-warn "Ket noi that bai - kiem tra lai dia chi va token"
-save_config "GATEWAY_ADDR" "$gw_addr"
-success "Da ket noi den $gw_addr"
-fi
-save_config "NODE_ROLE" "$NODE_ROLE"
-}
-
-setup_ai() {
-header "Buoc 4: Cai dat AI"
-if [[ "$AI_MODE" == "local" ]]; then
-if ! command -v ollama &>/dev/null; then
-info "Cai Ollama..."
-if [[ "$OS_TYPE" == "macos" ]]; then
-ensure_brew; brew install ollama
-else
-curl -fsSL https://ollama.ai/install.sh | sh
-fi
-fi
-if [[ "$OS_TYPE" == "macos" ]]; then
-brew services start ollama 2>/dev/null || true
-else
-systemctl enable ollama 2>/dev/null || true
-systemctl start ollama 2>/dev/null || true
-fi
-info "Tai Gemma 4 model..."
-ollama pull gemma3:4b
-save_config "OLLAMA_URL" "http://localhost:11434"
-save_config "AI_MODEL" "gemma3:4b"
-success "AI Local (Gemma3 4B) da san sang"
-else
-echo ""
-echo " +------------------------------------------+"
-echo " | Greenmind - AI API Setup |"
-echo " | Lay key tai: aistudio.google.com |"
-echo " +------------------------------------------+"
-local gemini_key test_resp
-gemini_key=$(ask "Gemini API Key")
-test_resp=$(curl -s -o /dev/null -w "%{http_code}" \
-"https://generativelanguage.googleapis.com/v1beta/models?key=$gemini_key")
-save_config "GEMINI_API_KEY" "$gemini_key"
-save_config "AI_MODEL" "gemini-2.0-flash-lite"
-[[ "$test_resp" == "200" ]] && success "API key hop le!" || warn "HTTP $test_resp - kiem tra lai"
-fi
-}
-
-install_ezviz_camera() {
-header " Camera Ezviz"
-pkg_install python3-pip 2>/dev/null || true
-pip3 install pyezviz requests --break-system-packages -q 2>/dev/null || pip3 install pyezviz requests -q
-local phone pass region serial
-phone=$(ask "So dien thoai Ezviz")
-pass=$(ask "Mat khau Ezviz")
-region=$(ask "Region" "apiisgp.ezvizlife.com")
-serial=$(ask "Serial camera")
-save_config "EZVIZ_PHONE" "$phone"
-save_config "EZVIZ_PASS" "$pass"
-save_config "EZVIZ_REGION" "$region"
-save_config "EZVIZ_SERIAL" "$serial"
-
-cat > "$GREENMIND_DIR/fall_detector.py" << 'FALLEOF'
-#!/usr/bin/env python3
-import json, time, os, requests, logging
-from pyezviz import EzvizClient
-from pyezviz.utils import decrypt_image
-
-logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s',
-handlers=[logging.FileHandler('/var/log/fall_detector.log'), logging.StreamHandler()])
-log = logging.getLogger(__name__)
-
-cfg = {}
-with open('/etc/greenmind/config.env') as f:
-for line in f:
-line = line.strip()
-if '=' in line and not line.startswith('#'):
-k, v = line.split('=', 1); cfg[k] = v
-
-EZVIZ_USER=cfg.get('EZVIZ_PHONE',''); EZVIZ_PASS=cfg.get('EZVIZ_PASS','')
-EZVIZ_REGION=cfg.get('EZVIZ_REGION','apiisgp.ezvizlife.com')
-CAMERA_SERIAL=cfg.get('EZVIZ_SERIAL','')
-BOT_TOKEN=cfg.get('TELEGRAM_BOT_TOKEN',''); CHAT_ID=cfg.get('TELEGRAM_CHAT_ID','')
-SESSION_CACHE='/tmp/ezviz_session.json'; STATE_FILE='/tmp/fall_detector_state.json'
-SNAP_FILE='/tmp/snap_fall_check.jpg'; POLL_INTERVAL=30; COOLDOWN=300
-
-def load_state():
-if os.path.exists(STATE_FILE):
-with open(STATE_FILE) as f: return json.load(f)
-return {'last_alarm_id': None, 'last_alert_time': 0}
-
-def save_state(s):
-with open(STATE_FILE, 'w') as f: json.dump(s, f)
-
-def get_client():
-c = EzvizClient(EZVIZ_USER, EZVIZ_PASS, EZVIZ_REGION)
-if os.path.exists(SESSION_CACHE):
-try:
-with open(SESSION_CACHE) as f: cache = json.load(f)
-if time.time() - cache.get('ts', 0) < 3600:
-c._session.headers.update(cache['headers'])
-for k, v in cache.get('cookies', {}).items():
-c._session.cookies.set(k, v)
-return c
-except: pass
-c.login()
-with open(SESSION_CACHE, 'w') as f:
-json.dump({'ts': time.time(), 'headers': dict(c._session.headers),
-'cookies': dict(c._session.cookies)}, f)
-return c
-
-def main():
-log.info("Fall detector started")
-state = load_state()
-while True:
-try:
-client = get_client()
-alarms = client.get_alarminfo(CAMERA_SERIAL, limit=5)['alarms']
-alarm = next((a for a in alarms if a.get('picUrl') or a.get('picUrlGroup')), None)
-if alarm and alarm['alarmId'] != state['last_alarm_id']:
-url = alarm.get('picUrl') or alarm.get('picUrlGroup')
-resp = client._session.get(url, timeout=15)
-data = decrypt_image(resp.content, EZVIZ_PASS)
-with open(SNAP_FILE, 'wb') as f: f.write(data)
-state['last_alarm_id'] = alarm['alarmId']; save_state(state)
-now = time.time()
-if now - state['last_alert_time'] > COOLDOWN and BOT_TOKEN:
-requests.post(
-f'https://api.telegram.org/bot{BOT_TOKEN}/sendPhoto',
-data={'chat_id': CHAT_ID,
-'caption': f"[FALL_CHECK] {alarm['alarmStartTimeStr']}"},
-files={'photo': open(SNAP_FILE, 'rb')}, timeout=15)
-state['last_alert_time'] = now; save_state(state)
-log.info("Sent [FALL_CHECK]")
-except Exception as e: log.error(f"Error: {e}")
-time.sleep(POLL_INTERVAL)
-
-if __name__ == '__main__': main()
-FALLEOF
-
-if [[ "$OS_TYPE" == "macos" ]]; then
-cat > /Library/LaunchDaemons/ai.greenmind.camera.plist << 'PLISTEOF'
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0"><dict>
-  <key>Label</key><string>ai.greenmind.camera</string>
-  <key>ProgramArguments</key><array><string>/usr/bin/python3</string><string>/opt/greenmind/fall_detector.py</string></array>
-  <key>RunAtLoad</key><true/><key>KeepAlive</key><true/>
-  <key>StandardOutPath</key><string>/var/log/fall_detector.log</string>
-  <key>StandardErrorPath</key><string>/var/log/fall_detector.log</string>
-</dict></plist>
-PLISTEOF
-launchctl load -w /Library/LaunchDaemons/ai.greenmind.camera.plist
-else
-cat > /etc/systemd/system/greenmind-camera.service << 'SVCEOF'
+# --- 🛠️ 8. Thiết lập Service & Uninstaller ---
+setup_service_and_clean() {
+    echo -e "${YELLOW}🔹 Bước 5: Tạo Service chạy ngầm & Uninstaller...${NC}"
+    
+    # Service cho Linux (Tinkerboard/VPS)
+    if [[ "$OS_TYPE" == "Linux" ]]; then
+        cat <<EOF > /etc/systemd/system/greenmind.service
 [Unit]
-Description=Greenmind Camera Fall Detector
+Description=GreenMind AI CCTV Service
 After=network.target
+
 [Service]
-ExecStart=/usr/bin/python3 /opt/greenmind/fall_detector.py
+ExecStart=$HOME/.greenmind/venv/bin/python3 $HOME/.greenmind/main.py
 Restart=always
-RestartSec=10
+User=$USER
+EnvironmentFile=/etc/greenmind/config.env
+
 [Install]
 WantedBy=multi-user.target
-SVCEOF
-systemctl daemon-reload && systemctl enable greenmind-camera && systemctl start greenmind-camera
+EOF
+        systemctl daemon-reload
+        systemctl enable greenmind > /dev/null 2>&1
+    fi
+
+    # Uninstaller 
+    cat <<EOF > "$HOME/.greenmind/uninstall.sh"
+#!/bin/bash
+echo "Đang gỡ bỏ GreenMind..."
+if command -v systemctl &> /dev/null && [ -f /etc/systemd/system/greenmind.service ]; then
+    systemctl stop greenmind
+    systemctl disable greenmind
+    rm /etc/systemd/system/greenmind.service
 fi
-INSTALLED_MODULES+=("Camera Ezviz")
-success "Ezviz Camera da cai"
+rm -rf "$HOME/.greenmind"
+rm -rf /etc/greenmind
+echo "Đã dọn dẹp sạch sẽ nà Zai!"
+EOF
+    chmod +x "$HOME/.greenmind/uninstall.sh"
 }
 
-install_tts_speaker() {
-header " TTS Speaker"
-if [[ "$OS_TYPE" == "macos" ]]; then
-pkg_install python3 ffmpeg
-pip3 install gtts -q 2>/dev/null || pip3 install gtts --break-system-packages -q
+# --- 🏁 CHẠY TỔNG LỰC ---
+print_header
+check_env
+setup_core
+setup_venv
+setup_ai_engines
+setup_config
+setup_service_and_clean
+
+echo -e "\n${GREEN}${BOLD}✅ CÀI ĐẶT HOÀN TẤT - TIẾN LÊN TỔNG TÀI!${NC}"
+echo -e "${YELLOW}Zai hãy kiểm tra config tại: /etc/greenmind/config.env${NC}"
+if [[ "$OS_TYPE" == "Linux" ]]; then
+    echo -e "${BLUE}Khởi động bằng lệnh: sudo systemctl start greenmind${NC}"
 else
-apt-get install -y python3-pip ffmpeg mpg123 bluez pulseaudio pulseaudio-module-bluetooth alsa-utils -q
-pip3 install gtts --break-system-packages -q
+    echo -e "${BLUE}Khởi động bằng lệnh: source ~/.greenmind/venv/bin/activate && python3 main.py${NC}"
 fi
-echo " [1] 3.5mm jack [2] Bluetooth"
-local audio_type
-audio_type=$(ask "Loai audio" "1")
-if [[ "$audio_type" == "2" ]]; then
-if [[ "$OS_TYPE" == "macos" ]]; then
-warn "macOS: Ket noi Bluetooth qua System Settings > Bluetooth"
-bt_mac=$(ask "MAC address loa Bluetooth (tuy chon)")
-[[ -n "$bt_mac" ]] && save_config "BT_SPEAKER_MAC" "$bt_mac"
-else
-info "Scan Bluetooth 10 giay..."
-systemctl start bluetooth 2>/dev/null || true
-bluetoothctl power on 2>/dev/null || true
-bluetoothctl --timeout 10 scan on 2>/dev/null || true
-bluetoothctl devices 2>/dev/null | head -10
-local bt_mac
-bt_mac=$(ask "MAC address loa Bluetooth")
-bluetoothctl pair "$bt_mac" 2>/dev/null || true
-bluetoothctl trust "$bt_mac" 2>/dev/null || true
-pulseaudio --start 2>/dev/null || true; sleep 2
-bluetoothctl connect "$bt_mac" 2>/dev/null || true
-save_config "BT_SPEAKER_MAC" "$bt_mac"
-fi
-fi
-cat > "$GREENMIND_DIR/tts_speak.py" << 'TTSEOF'
-#!/usr/bin/env python3
-import sys, subprocess, tempfile, os
-from gtts import gTTS
-
-def speak(text, lang='vi'):
-with tempfile.NamedTemporaryFile(suffix='.mp3', delete=False) as f: tmp_mp3 = f.name
-wav = tmp_mp3.replace('.mp3', '.wav')
-gTTS(text, lang=lang).save(tmp_mp3)
-subprocess.run(['ffmpeg','-y','-i',tmp_mp3,'-ar','44100','-ac','2',wav],
-stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-import platform
-player = 'afplay' if platform.system() == 'Darwin' else 'paplay'
-subprocess.run([player, wav])
-os.unlink(tmp_mp3); os.unlink(wav)
-
-if __name__ == '__main__':
-speak(' '.join(sys.argv[1:]))
-TTSEOF
-chmod +x "$GREENMIND_DIR/tts_speak.py"
-python3 "$GREENMIND_DIR/tts_speak.py" "Greenmind da san sang" 2>/dev/null || warn "Kiem tra lai loa"
-INSTALLED_MODULES+=("TTS Speaker")
-success "TTS Speaker da cai"
-}
-
-install_dht_sensor() {
-header " DHT Sensor"
-if [[ "$OS_TYPE" == "macos" ]]; then
-warn "DHT Sensor yeu cau Linux/Raspberry Pi/Tinkerboard. Bo qua tren macOS."
-INSTALLED_MODULES+=("DHT Sensor [SKIPPED - macOS]")
-return 0
-fi
-apt-get install -y python3-pip python3-dev libgpiod2 -q
-pip3 install adafruit-circuitpython-dht --break-system-packages -q
-echo " [1] DHT11 [2] DHT22"
-local sensor_type gpio_pin
-sensor_type=$(ask "Loai cam bien" "2")
-gpio_pin=$(ask "GPIO pin so" "4")
-save_config "DHT_TYPE" "$([[ $sensor_type == 1 ]] && echo DHT11 || echo DHT22)"
-save_config "DHT_PIN" "$gpio_pin"
-cat > "$GREENMIND_DIR/dht_monitor.py" << 'DHTEOF'
-#!/usr/bin/env python3
-import time, logging, board, adafruit_dht
-logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s',
-handlers=[logging.FileHandler('/var/log/greenmind_dht.log')])
-log = logging.getLogger(__name__)
-cfg = {}
-with open('/etc/greenmind/config.env') as f:
-for line in f:
-if '=' in line: k,v=line.strip().split('=',1); cfg[k]=v
-pin = getattr(board, f"D{cfg.get('DHT_PIN','4')}")
-dht = adafruit_dht.DHT22(pin) if cfg.get('DHT_TYPE','DHT22')=='DHT22' else adafruit_dht.DHT11(pin)
-while True:
-try: log.info(f"Temp={dht.temperature:.1f}C Humidity={dht.humidity:.1f}%")
-except Exception as e: log.warning(f"Read error: {e}")
-time.sleep(60)
-DHTEOF
-cat > /etc/systemd/system/greenmind-dht.service << 'SVCEOF'
-[Unit]
-Description=Greenmind DHT Sensor
-After=multi-user.target
-[Service]
-ExecStart=/usr/bin/python3 /opt/greenmind/dht_monitor.py
-Restart=always
-RestartSec=30
-[Install]
-WantedBy=multi-user.target
-SVCEOF
-systemctl daemon-reload && systemctl enable greenmind-dht && systemctl start greenmind-dht
-# (macOS skipped above via early return)
-INSTALLED_MODULES+=("DHT Sensor")
-success "DHT Sensor da cai"
-}
-
-install_relay_control() {
-header " Relay Control"
-if [[ "$OS_TYPE" == "macos" ]]; then
-warn "Relay Control yeu cau Linux/Raspberry Pi/Tinkerboard. Bo qua tren macOS."
-INSTALLED_MODULES+=("Relay Control [SKIPPED - macOS]")
-return 0
-fi
-apt-get install -y python3-gpiozero -q
-local num_relays
-num_relays=$(ask "So relay" "2")
-declare -a relay_pins=()
-for ((i=1; i<=num_relays; i++)); do
-relay_pins+=("$(ask "GPIO pin relay $i")")
-done
-save_config "RELAY_COUNT" "$num_relays"
-save_config "RELAY_PINS" "$(IFS=,; echo "${relay_pins[*]}")"
-cat > "$GREENMIND_DIR/relay_control.py" << 'RELEOF'
-#!/usr/bin/env python3
-from gpiozero import OutputDevice; import sys
-cfg = {}
-with open('/etc/greenmind/config.env') as f:
-for line in f:
-if '=' in line: k,v=line.strip().split('=',1); cfg[k]=v
-relays = [OutputDevice(int(p), active_high=False) for p in cfg.get('RELAY_PINS','').split(',') if p]
-if __name__ == '__main__':
-cmd, idx = sys.argv[1], int(sys.argv[2])
-{'on': lambda r: r.on(), 'off': lambda r: r.off(),
-'toggle': lambda r: r.toggle()}[cmd](relays[idx])
-print(f"Relay {idx}: {cmd}")
-RELEOF
-INSTALLED_MODULES+=("Relay Control")
-success "Relay Control da cai"
-}
-
-install_telegram_alerts() {
-header " Telegram Alerts"
-echo "Tao bot tai: https://t.me/BotFather"
-local bot_token chat_id resp
-bot_token=$(ask "Bot Token")
-chat_id=$(ask "Chat ID")
-save_config "TELEGRAM_BOT_TOKEN" "$bot_token"
-save_config "TELEGRAM_CHAT_ID" "$chat_id"
-resp=$(curl -s -o /dev/null -w "%{http_code}" \
-"https://api.telegram.org/bot${bot_token}/sendMessage" \
---data-urlencode "chat_id=${chat_id}" \
---data-urlencode "text=Greenmind da ket noi - Ngoi nha biet nhin")
-[[ "$resp" == "200" ]] && success "Telegram OK!" || warn "HTTP $resp"
-INSTALLED_MODULES+=("Telegram Alerts")
-success "Telegram Alerts da cai"
-}
-
-install_messaging_bot() {
-header " Ket noi Telegram/WhatsApp voi AI"
-echo " [1] Telegram [2] WhatsApp [3] Ca hai"
-local choice
-choice=$(ask "Lua chon" "1")
-if [[ "$choice" == "1" || "$choice" == "3" ]]; then
-local tg_token tg_chat
-tg_token=$(ask "Telegram Bot Token")
-tg_chat=$(ask "Telegram Chat ID")
-save_config "TELEGRAM_BOT_TOKEN" "$tg_token"
-save_config "TELEGRAM_CHAT_ID" "$tg_chat"
-openclaw channel add telegram --bot-token "$tg_token" --allowed-users "$tg_chat" 2>/dev/null || \
-warn "Cau hinh thu cong tai: docs.openclaw.ai"
-success "Telegram OK - Nhan /start trong bot de bat dau"
-fi
-if [[ "$choice" == "2" || "$choice" == "3" ]]; then
-openclaw channel add whatsapp 2>/dev/null || \
-warn "Xem: openclaw channel info whatsapp"
-success "WhatsApp da bat"
-fi
-if [[ "$OS_TYPE" == "macos" ]]; then
-brew services restart openclaw-gateway 2>/dev/null || true
-else
-systemctl restart openclaw-gateway 2>/dev/null || true
-fi
-INSTALLED_MODULES+=("Messaging Bot")
-success "Messaging Bot da cai"
-}
-
-select_iot_modules() {
-header "Buoc 5: Module IoT"
-echo "Chon module (nhap so cach nhau, hoac 'all'):"
-echo ""
-echo " 1. Camera Ezviz (fall detection, dem nguoi)"
-echo " 2. TTS Speaker (gTTS + Bluetooth/3.5mm)"
-echo " 3. Cam bien nhiet do/do am (DHT11/DHT22)"
-echo " 4. Relay Control (den, quat)"
-echo " 5. Telegram Alerts"
-echo " 6. Ket noi Telegram/WhatsApp voi AI"
-echo ""
-local choices
-read -rp "? Lua chon: " choices
-declare -A sel=([1]=false [2]=false [3]=false [4]=false [5]=false [6]=false)
-if [[ "$choices" == "all" ]]; then
-for i in 1 2 3 4 5 6; do sel[$i]=true; done
-else
-for c in $choices; do [[ -v "sel[$c]" ]] && sel[$c]=true; done
-fi
-${sel[1]} && install_ezviz_camera
-${sel[2]} && install_tts_speaker
-${sel[3]} && install_dht_sensor
-${sel[4]} && install_relay_control
-${sel[5]} && install_telegram_alerts
-${sel[6]} && install_messaging_bot
-}
-
-show_summary() {
-echo ""
-echo -e "${BOLD}${GREEN}"
-echo " +================================================+"
-echo " | Greenmind Installation Complete! |"
-echo " +================================================+"
-printf " | Node Role : %-32s|\n" "$NODE_ROLE"
-printf " | AI Mode : %-32s|\n" "$AI_MODE"
-echo " | Modules: |"
-for m in "${INSTALLED_MODULES[@]}"; do
-printf " | - %-42s|\n" "$m"
-done
-echo " | |"
-echo " | Config : /etc/greenmind/config.env |"
-echo " | Scripts: /opt/greenmind/ |"
-echo " | Logs : /var/log/greenmind_install.log |"
-echo " +================================================+"
-echo -e "${NC}"
-echo -e " ${BOLD}${CYAN}Greenmind - Ngoi nha biet nhin${NC}"
-echo ""
-}
-
-main() {
-init
-detect_hardware
-install_openclaw
-configure_node_role
-setup_ai
-select_iot_modules
-show_summary
-}
-
-main "$@"
-
