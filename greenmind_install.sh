@@ -13,19 +13,20 @@ export RED='\033[0;31m'
 export NC='\033[0m'
 export BOLD='\033[1m'
 
-# --- 🌀 2. Hàm hiệu ứng Spinner ---
+# --- 🌀 2. Hàm hiệu ứng Spinner (Đã fix lỗi "Đoàn tàu") ---
 spinner() {
     local pid=$1
     local delay=0.1
     local spinstr='|/-\'
-    while [ "$(ps a | awk '{print $1}' | grep $pid)" ]; do
+    while kill -0 $pid 2>/dev/null; do
         local temp=${spinstr#?}
-        printf "${BLUE} [%c] Đang xử lý... ${NC}" "$spinstr"
+        # Dùng \r để đưa con trỏ về đầu dòng, ghi đè cực mượt nà
+        printf "\r${BLUE} [%c] Đang xử lý... ${NC}" "$spinstr"
         local spinstr=$temp${spinstr%"$temp"}
         sleep $delay
-        printf "\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b"
     done
-    printf "    \b\b\b\b"
+    # Xóa dòng đang xử lý và in dấu check xanh lá
+    printf "\r${GREEN} [✓] Xong phim!        ${NC}\n"
 }
 
 print_header() {
