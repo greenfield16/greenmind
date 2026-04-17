@@ -153,25 +153,87 @@ setup_ai_engines() {
     fi
 }
 
-# --- ⚙️ 7. Cấu hình Camera ---
+# --- ⚙️ 7. Quản lý Thiết bị & Camera (Menu Động) ---
 setup_config() {
     ((CURRENT_STEP++))
-    echo -e "\n${BOLD}${YELLOW}[$CURRENT_STEP/$TOTAL_STEPS] GHI CẤU HÌNH HỆ THỐNG${NC}"
+    echo -e "\n${BOLD}${YELLOW}[$CURRENT_STEP/$TOTAL_STEPS] THIẾT LẬP THIẾT BỊ NGOẠI VI & CAMERA${NC}"
+    
+    CONFIG_FILE="/etc/greenmind/config.env"
     mkdir -p /etc/greenmind
-    if [ ! -f /etc/greenmind/config.env ]; then
-        cat <<EOF > /etc/greenmind/config.env
+    
+    # 1. Tạo file gốc nếu chưa có
+    if [ ! -f "$CONFIG_FILE" ]; then
+        cat <<EOF > "$CONFIG_FILE"
+# GREENMIND SYSTEM CORE CONFIG
 AI_ENGINE=$LOCAL_MODEL
 GEMINI_KEY=YOUR_KEY_HERE
 MQTT_BROKER=localhost
 MQTT_PORT=1883
-EZVIZ_USER=admin
-EZVIZ_PASS=password
+
+# --- DANH SÁCH THIẾT BỊ ---
 EOF
-        chmod 600 /etc/greenmind/config.env
-        echo -e "${GREEN} [✓] Đã tạo file config.env an toàn.${NC}"
-    else
-        echo -e "${GREEN} [✓] Cấu hình cũ đã tồn tại, giữ nguyên nà.${NC}"
+        chmod 600 "$CONFIG_FILE"
     fi
+
+    # 2. Vòng lặp thêm thiết bị
+    echo -e "${CYAN}🤖 HỆ THỐNG QUẢN LÝ THIẾT BỊ GREENMIND${NC}"
+    while true; do
+        read -p "👉 Zai/Khách hàng có muốn thêm thiết bị vào hệ thống khum? (y/n): " add_device
+        if [[ ! "$add_device" =~ ^[Yy]$ ]]; then
+            break
+        fi
+
+        echo -e "\n  ${BLUE}1)${NC} 📷 Camera giám sát (CCTV)"
+        echo -e "  ${BLUE}2)${NC} 🔊 Loa báo động thông minh"
+        echo -e "  ${BLUE}3)${NC} ❄️ Thiết bị Smart Home (Máy lạnh, Đèn...)"
+        read -p "👉 Chọn loại thiết bị (1-3): " dev_type
+
+        # XỬ LÝ CAMERA
+        if [[ "$dev_type" == "1" ]]; then
+            echo -e "\n${CYAN}--- CẤU HÌNH CAMERA ---${NC}"
+            echo -e "  1) Hikvision"
+            echo -e "  2) Dahua / Kbvision"
+            echo -e "  3) Ezviz / Imou (Dùng mã Verification Code)"
+            echo -e "  4) Hãng khác / Tùy chỉnh (Nhập thẳng link RTSP)"
+            read -p "👉 Chọn hãng Camera: " cam_brand
+
+            if [[ "$cam_brand" == "4" ]]; then
+                read -p "Nhập link RTSP gốc: " cam_rtsp
+            else
+                read -p "Nhập IP Camera (VD: 192.168.1.100): " cam_ip
+                read -p "Nhập User (Thường là admin): " cam_user
+                read -p "Nhập Mật khẩu (hoặc Verification Code dưới đít Cam): " cam_pass
+
+                # Tự động Build link RTSP theo chuẩn của từng hãng nà Zai 🛡️
+                if [[ "$cam_brand" == "1" || "$cam_brand" == "3" ]]; then
+                    cam_rtsp="rtsp://${cam_user}:${cam_pass}@${cam_ip}:554/Streaming/Channels/101"
+                elif [[ "$cam_brand" == "2" ]]; then
+                    cam_rtsp="rtsp://${cam_user}:${cam_pass}@${cam_ip}:554/cam/realmonitor?channel=1&subtype=0"
+                else
+                    cam_rtsp="rtsp://${cam_user}:${cam_pass}@${cam_ip}:554/11" # Chuẩn Onvif chung
+                fi
+            fi
+
+            read -p "Đặt Tên/Mã cho Camera này (VD: CAM_KHO_01): " cam_name
+            # Ghi đè vào file env
+            echo "${cam_name}_RTSP=\"${cam_rtsp}\"" >> "$CONFIG_FILE"
+            echo -e "${GREEN} [✓] Đã đưa ${cam_name} vào hệ thống ngắm bắn!${NC}\n"
+
+        # XỬ LÝ LOA
+        elif [[ "$dev_type" == "2" ]]; then
+            echo -e "\n${CYAN}--- CẤU HÌNH LOA BÁO ĐỘNG ---${NC}"
+            read -p "Nhập IP của Loa (VD: 192.168.1.105): " speaker_ip
+            read -p "Đặt tên cho Loa (VD: SPEAKER_SAN_TRUOC): " speaker_name
+            echo "${speaker_name}_IP=\"${speaker_ip}\"" >> "$CONFIG_FILE"
+            echo -e "${GREEN} [✓] Đã nạp đạn cho ${speaker_name}!${NC}\n"
+
+        # XỬ LÝ SMART HOME
+        elif [[ "$dev_type" == "3" ]]; then
+            echo -e "\n${YELLOW}🛠️ Module Smart Home (Tuya/Sonoff) đang được Zai Joseph phát triển. Hẹn ở bản update sau nà!${NC}\n"
+        fi
+    done
+
+    echo -e "${GREEN} [✓] Đã lưu toàn bộ cấu hình thiết bị. File config.env đã sẵn sàng!${NC}"
 }
 
 # --- 🛠️ 8. Thiết lập Service ---
