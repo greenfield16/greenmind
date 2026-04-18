@@ -14,7 +14,7 @@ export CYAN='\033[0;36m'
 export NC='\033[0m'
 export BOLD='\033[1m'
 
-TOTAL_STEPS=6
+TOTAL_STEPS=7
 CURRENT_STEP=0
 NODE_ROLE="gateway"  # gateway | node
 
@@ -294,6 +294,70 @@ EOF
     fi
 }
 
+
+# --- 📊 Dashboard ---
+setup_dashboard() {
+    ((CURRENT_STEP++))
+    echo -e "\n${BOLD}${YELLOW}[$CURRENT_STEP/$TOTAL_STEPS] CÀI ĐẶT DASHBOARD${NC}"
+
+    GREENMIND_DIR="${GREENMIND_DIR:-$HOME/.greenmind}"
+    VENV_PATH="$GREENMIND_DIR/venv"
+
+    # Tạo thư mục templates
+    mkdir -p "$GREENMIND_DIR/templates"
+
+    # Download dashboard.py và index.html
+    run_with_process "Tải dashboard backend" curl -fsSL         https://raw.githubusercontent.com/greenfield16/greenmind/main/dashboard.py         -o "$GREENMIND_DIR/dashboard.py"
+
+    run_with_process "Tải dashboard frontend" curl -fsSL         https://raw.githubusercontent.com/greenfield16/greenmind/main/templates/index.html         -o "$GREENMIND_DIR/templates/index.html"
+
+    # Cài dependencies
+    run_with_process "Cài FastAPI + uvicorn" "$VENV_PATH/bin/pip" install fastapi "uvicorn[standard]" opencv-python-headless -q
+
+    # Tạo service / launchd
+    PORT="${GREENMIND_PORT:-8765}"
+    if [[ "$OS_TYPE" == "Linux" ]]; then
+        cat > /etc/systemd/system/greenmind-dashboard.service << EOF
+[Unit]
+Description=Greenmind Dashboard
+After=network.target
+[Service]
+ExecStart=$VENV_PATH/bin/python3 $GREENMIND_DIR/dashboard.py
+Restart=always
+User=$SUDO_USER
+Environment=GREENMIND_PORT=$PORT
+EnvironmentFile=/etc/greenmind/config.env
+[Install]
+WantedBy=multi-user.target
+EOF
+        systemctl daemon-reload
+        systemctl enable greenmind-dashboard
+        systemctl start greenmind-dashboard
+    else
+        cat > /Library/LaunchDaemons/ai.greenmind.dashboard.plist << EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>Label</key><string>ai.greenmind.dashboard</string>
+  <key>ProgramArguments</key><array>
+    <string>$VENV_PATH/bin/python3</string>
+    <string>$GREENMIND_DIR/dashboard.py</string>
+  </array>
+  <key>EnvironmentVariables</key><dict>
+    <key>GREENMIND_PORT</key><string>$PORT</string>
+  </dict>
+  <key>RunAtLoad</key><true/><key>KeepAlive</key><true/>
+  <key>StandardOutPath</key><string>/var/log/greenmind_dashboard.log</string>
+  <key>StandardErrorPath</key><string>/var/log/greenmind_dashboard.log</string>
+</dict></plist>
+EOF
+        launchctl load -w /Library/LaunchDaemons/ai.greenmind.dashboard.plist 2>/dev/null || true
+    fi
+
+    echo -e "${GREEN} [✓] Dashboard chạy tại: http://localhost:$PORT${NC}"
+    echo -e "${CYAN}     Truy cập từ máy khác trong LAN: http://$(hostname -I | awk '{print $1}'):$PORT${NC}"
+}
+
 # --- 🏁 CHẠY TỔNG LỰC ---
 check_env
 show_intro
@@ -303,6 +367,7 @@ setup_venv
 setup_ai_engines
 setup_config
 setup_service
+setup_dashboard
 
 # --- Kết nối Node về Gateway ---
 if [[ "$NODE_ROLE" == "node" ]]; then
