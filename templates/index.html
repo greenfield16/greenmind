@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🌿 Greenmind Dashboard</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0f1117;color:#e0e0e0;font-family:'Segoe UI',sans-serif;min-height:100vh}
+
+/* Header */
+.header{background:#1a1d27;padding:14px 24px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #2a2d3a;position:sticky;top:0;z-index:50}
+.logo{display:flex;align-items:center;gap:10px}
+.logo-text{font-size:20px;font-weight:700;color:#4caf7d;letter-spacing:1px}
+.logo small{font-size:11px;color:#555;margin-left:4px}
+.header-right{display:flex;align-items:center;gap:20px;font-size:13px;color:#888}
+.dot{width:8px;height:8px;border-radius:50%;background:#4caf7d;display:inline-block;margin-right:5px;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* Stats */
+.statsbar{background:#1a1d27;padding:10px 24px;display:flex;gap:32px;border-bottom:1px solid #2a2d3a;font-size:13px;flex-wrap:wrap}
+.stat{display:flex;align-items:center;gap:8px}
+.stat .num{font-size:22px;font-weight:700;color:#4caf7d}
+.stat.warn .num{color:#f5a623}
+.stat.err .num{color:#e74c3c}
+.stat label{font-size:11px;color:#666;display:block;line-height:1.3}
+.stat-sep{margin-left:auto;font-size:12px;color:#444;align-self:center}
+
+/* Toolbar */
+.toolbar{padding:12px 24px;display:flex;align-items:center;gap:10px;background:#13151f;flex-wrap:wrap}
+.btn{padding:7px 16px;border-radius:6px;border:none;cursor:pointer;font-size:13px;font-weight:500;transition:.15s}
+.btn-primary{background:#4caf7d;color:#fff}.btn-primary:hover{background:#3d9e6e}
+.btn-outline{background:transparent;color:#aaa;border:1px solid #333}.btn-outline:hover{border-color:#4caf7d;color:#4caf7d}
+.btn-active{background:#1e2535;color:#4caf7d;border:1px solid #4caf7d}
+.search{margin-left:auto;background:#1e2535;border:1px solid #2a2d3a;border-radius:6px;padding:7px 14px;color:#ccc;font-size:13px;outline:none;width:220px}
+.search::placeholder{color:#555}
+
+/* Grid */
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;padding:20px 24px}
+@media(max-width:1300px){.grid{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:960px){.grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:600px){.grid{grid-template-columns:1fr}}
+
+/* Card */
+.cam-card{background:#1a1d27;border-radius:10px;overflow:hidden;border:1px solid #2a2d3a;cursor:pointer;transition:.2s;position:relative}
+.cam-card:hover{border-color:#4caf7d;transform:translateY(-2px);box-shadow:0 4px 20px rgba(76,175,125,.15)}
+.cam-card.offline{opacity:.5}
+.cam-card.alert-card{border-color:#e74c3c}
+
+.cam-thumb{width:100%;aspect-ratio:16/9;background:#0d0f17;position:relative;overflow:hidden}
+.cam-thumb img{width:100%;height:100%;object-fit:cover;display:block;background:#0d0f17}
+.no-signal{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#444;font-size:12px;gap:6px}
+.no-signal .icon{font-size:32px}
+
+.badge-status{position:absolute;top:8px;left:8px;padding:3px 8px;border-radius:4px;font-size:10px;font-weight:700;letter-spacing:.5px}
+.badge-online{background:rgba(76,175,125,.85);color:#fff}
+.badge-offline{background:rgba(80,80,80,.85);color:#ccc}
+.badge-alert{background:rgba(231,76,60,.9);color:#fff}
+.badge-rec{position:absolute;top:8px;right:8px;background:rgba(231,76,60,.85);color:#fff;font-size:10px;font-weight:700;padding:3px 7px;border-radius:4px;display:flex;align-items:center;gap:4px}
+.rec-dot{width:6px;height:6px;border-radius:50%;background:#fff;animation:pulse 1s infinite}
+.cam-ts{position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,.55);color:#aaa;font-size:10px;padding:3px 8px;font-family:monospace}
+
+.cam-info{padding:10px 12px;display:flex;align-items:center;justify-content:space-between}
+.cam-name{font-size:13px;font-weight:600;color:#ddd}
+.cam-loc{font-size:11px;color:#666;margin-top:2px}
+.cam-actions{display:flex;gap:6px}
+.icon-btn{background:#252836;border:none;border-radius:5px;color:#888;padding:5px 8px;cursor:pointer;font-size:13px;transition:.15s}
+.icon-btn:hover{background:#2e3347;color:#4caf7d}
+
+/* Loading shimmer */
+.shimmer{background:linear-gradient(90deg,#1a1d27 25%,#252836 50%,#1a1d27 75%);background-size:200% 100%;animation:shimmer 1.5s infinite}
+@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+
+/* Detail panel */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99;display:none}
+.overlay.open{display:block}
+.panel{position:fixed;right:0;top:0;bottom:0;width:360px;background:#1a1d27;border-left:1px solid #2a2d3a;z-index:100;transform:translateX(100%);transition:.25s;overflow-y:auto;padding:20px}
+.panel.open{transform:translateX(0)}
+.panel-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+.panel-header h3{font-size:15px;color:#4caf7d}
+.close-btn{background:none;border:none;color:#666;font-size:20px;cursor:pointer;padding:0 4px}
+.close-btn:hover{color:#fff}
+.panel-img{width:100%;border-radius:8px;margin-bottom:14px;background:#0d0f17;aspect-ratio:16/9;object-fit:cover}
+.panel-row{display:flex;justify-content:space-between;font-size:13px;padding:8px 0;border-bottom:1px solid #252836;color:#999}
+.panel-row span:last-child{color:#ddd;font-weight:500}
+.panel-actions{display:flex;gap:8px;margin-top:14px}
+.panel-btn{flex:1;padding:9px;border-radius:6px;border:none;cursor:pointer;font-size:13px;font-weight:500;transition:.15s}
+.panel-btn-primary{background:#4caf7d;color:#fff}.panel-btn-primary:hover{background:#3d9e6e}
+.panel-btn-outline{background:#252836;color:#aaa;border:1px solid #333}.panel-btn-outline:hover{border-color:#4caf7d;color:#4caf7d}
+.ai-box{margin-top:16px;background:#13151f;border-radius:8px;padding:12px}
+.ai-box h4{font-size:12px;color:#4caf7d;margin-bottom:10px;font-weight:600}
+.ai-event{font-size:12px;color:#ccc;padding:6px 0;border-bottom:1px solid #1e2535;display:flex;gap:8px;align-items:flex-start}
+.tag{border-radius:3px;padding:2px 6px;font-size:10px;font-weight:700;flex-shrink:0}
+.tag-alert{background:#e74c3c22;color:#e74c3c}
+.tag-warn{background:#f5a62322;color:#f5a623}
+.tag-ok{background:#4caf7d22;color:#4caf7d}
+.no-cam{text-align:center;padding:80px 24px;color:#555;grid-column:1/-1}
+.no-cam .big{font-size:48px;margin-bottom:12px}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo">
+    <span class="logo-text">🌿 GREENMIND</span>
+    <small>AI CCTV Dashboard</small>
+  </div>
+  <div class="header-right">
+    <span><span class="dot"></span><span id="sys-status">Đang tải...</span></span>
+    <span>🕐 <span id="clock">--:--:--</span></span>
+    <span id="location">📍 Greenmind</span>
+  </div>
+</div>
+
+<div class="statsbar">
+  <div class="stat"><div class="num" id="stat-total">—</div><label>TỔNG CAM</label></div>
+  <div class="stat"><div class="num" id="stat-online">—</div><label>ONLINE</label></div>
+  <div class="stat warn"><div class="num" id="stat-offline">—</div><label>OFFLINE</label></div>
+  <div class="stat err"><div class="num" id="stat-alert">0</div><label>CẢNH BÁO</label></div>
+  <div class="stat-sep">Cập nhật: <span id="last-update" style="color:#4caf7d">—</span></div>
+</div>
+
+<div class="toolbar">
+  <button class="btn btn-active" id="btn-grid" onclick="setView('grid')">⊞ Grid</button>
+  <button class="btn btn-outline" id="btn-list" onclick="setView('list')">≡ Danh sách</button>
+  <button class="btn btn-outline" onclick="filterAlerts()">⚠️ Chỉ cảnh báo</button>
+  <button class="btn btn-primary" onclick="refreshAll()">🔄 Refresh</button>
+  <input class="search" id="search" type="text" placeholder="🔍 Tìm camera..." oninput="filterCameras()">
+</div>
+
+<div class="grid" id="grid"></div>
+
+<!-- Detail overlay -->
+<div class="overlay" id="overlay" onclick="closePanel()"></div>
+<div class="panel" id="panel">
+  <div class="panel-header">
+    <h3 id="panel-title">Chi tiết camera</h3>
+    <button class="close-btn" onclick="closePanel()">✕</button>
+  </div>
+  <img class="panel-img" id="panel-img" src="" alt="">
+  <div id="panel-rows"></div>
+  <div class="panel-actions">
+    <button class="panel-btn panel-btn-primary" id="panel-capture" onclick="captureNow()">📸 Chụp ngay</button>
+    <button class="panel-btn panel-btn-outline" onclick="closePanel()">Đóng</button>
+  </div>
+  <div class="ai-box">
+    <h4>🤖 Sự kiện AI</h4>
+    <div class="ai-event"><span class="tag tag-ok">Hệ thống</span><span>AI event sẽ hiển thị tại đây khi được tích hợp.</span></div>
+  </div>
+</div>
+
+<script>
+let allCameras = [];
+let activeFilter = 'all';
+let selectedCam = null;
+
+async function fetchCameras() {
+  try {
+    const r = await fetch('/api/cameras');
+    allCameras = await r.json();
+    renderStats();
+    renderGrid();
+    document.getElementById('last-update').textContent = new Date().toLocaleTimeString('vi-VN');
+    const online = allCameras.filter(c=>c.online).length;
+    document.getElementById('sys-status').textContent =
+      online === allCameras.length ? 'Hoạt động bình thường' :
+      online === 0 ? 'Mất kết nối' : `${online}/${allCameras.length} cam online`;
+  } catch(e) {
+    document.getElementById('sys-status').textContent = 'Không kết nối được server';
+  }
+}
+
+function renderStats() {
+  const total = allCameras.length;
+  const online = allCameras.filter(c=>c.online===true).length;
+  const offline = allCameras.filter(c=>c.online===false||c.online===null).length;
+  document.getElementById('stat-total').textContent = total;
+  document.getElementById('stat-online').textContent = online;
+  document.getElementById('stat-offline').textContent = offline;
+}
+
+function getFiltered() {
+  const q = document.getElementById('search').value.toLowerCase();
+  return allCameras.filter(c => {
+    const match = c.name.toLowerCase().includes(q);
+    if (activeFilter === 'alert') return match && c.online === false;
+    return match;
+  });
+}
+
+function renderGrid() {
+  const cams = getFiltered();
+  const grid = document.getElementById('grid');
+  if (cams.length === 0) {
+    grid.innerHTML = '<div class="no-cam"><div class="big">📷</div><div>Không có camera nào.<br>Thêm camera vào /etc/greenmind/config.env</div></div>';
+    return;
+  }
+  grid.innerHTML = cams.map(c => {
+    const online = c.online === true;
+    const ts = c.last_snap ? new Date(c.last_snap*1000).toLocaleTimeString('vi-VN') : null;
+    return `
+    <div class="cam-card ${!online?'offline':''}" onclick="openPanel('${c.name}')">
+      <div class="cam-thumb">
+        ${online
+          ? `<img id="img-${c.name}" src="/api/snapshot/${c.name}?t=${Date.now()}" alt="${c.name}" onerror="this.src=''" loading="lazy">`
+          : `<div class="no-signal"><div class="icon">📷</div><div>Mất tín hiệu</div></div>`
+        }
+        <div class="badge-status ${online?'badge-online':'badge-offline'}">
+          ${online ? '● LIVE' : '○ OFFLINE'}
+        </div>
+        ${ts ? `<div class="cam-ts">${ts} — ${c.name}</div>` : ''}
+      </div>
+      <div class="cam-info">
+        <div>
+          <div class="cam-name">${c.name}</div>
+          <div class="cam-loc">${online ? '🟢 Online' : '🔴 Offline'}</div>
+        </div>
+        <div class="cam-actions">
+          <button class="icon-btn" title="Chụp ảnh" onclick="event.stopPropagation();quickCapture('${c.name}')">📸</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function quickCapture(name) {
+  const img = document.getElementById('img-'+name);
+  if (img) { img.style.opacity = '.3'; }
+  await fetch('/api/capture/'+name);
+  if (img) {
+    img.src = `/api/snapshot/${name}?t=${Date.now()}`;
+    img.style.opacity = '1';
+  }
+}
+
+async function openPanel(name) {
+  selectedCam = name;
+  const cam = allCameras.find(c=>c.name===name);
+  if (!cam) return;
+  document.getElementById('panel-title').textContent = cam.name;
+  const img = document.getElementById('panel-img');
+  img.src = `/api/snapshot/${name}?t=${Date.now()}`;
+  const ts = cam.last_snap ? new Date(cam.last_snap*1000).toLocaleString('vi-VN') : '—';
+  document.getElementById('panel-rows').innerHTML = `
+    <div class="panel-row"><span>Trạng thái</span><span style="color:${cam.online?'#4caf7d':'#e74c3c'}">${cam.online?'🟢 Online':'🔴 Offline'}</span></div>
+    <div class="panel-row"><span>RTSP URL</span><span style="font-size:11px;word-break:break-all">${cam.rtsp.replace(/:[^:@]+@/, ':***@')}</span></div>
+    <div class="panel-row"><span>Ảnh cuối</span><span>${ts}</span></div>
+  `;
+  document.getElementById('panel').classList.add('open');
+  document.getElementById('overlay').classList.add('open');
+}
+
+async function captureNow() {
+  if (!selectedCam) return;
+  const btn = document.getElementById('panel-capture');
+  btn.textContent = '⏳ Đang chụp...';
+  btn.disabled = true;
+  await fetch('/api/capture/'+selectedCam);
+  const img = document.getElementById('panel-img');
+  img.src = `/api/snapshot/${selectedCam}?t=${Date.now()}`;
+  btn.textContent = '📸 Chụp ngay';
+  btn.disabled = false;
+  await fetchCameras();
+}
+
+function closePanel() {
+  document.getElementById('panel').classList.remove('open');
+  document.getElementById('overlay').classList.remove('open');
+  selectedCam = null;
+}
+
+async function refreshAll() {
+  await fetchCameras();
+}
+
+function filterAlerts() {
+  activeFilter = activeFilter === 'alert' ? 'all' : 'alert';
+  renderGrid();
+}
+
+function filterCameras() { renderGrid(); }
+
+function setView(v) {
+  document.getElementById('btn-grid').className = v==='grid' ? 'btn btn-active' : 'btn btn-outline';
+  document.getElementById('btn-list').className = v==='list' ? 'btn btn-active' : 'btn btn-outline';
+}
+
+// Clock
+function updateClock() {
+  document.getElementById('clock').textContent = new Date().toLocaleTimeString('vi-VN');
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// Auto-refresh mỗi 15 giây
+setInterval(fetchCameras, 15000);
+fetchCameras();
+</script>
+</body>
+</html>
