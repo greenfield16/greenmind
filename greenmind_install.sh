@@ -14,7 +14,7 @@ export CYAN='\033[0;36m'
 export NC='\033[0m'
 export BOLD='\033[1m'
 
-TOTAL_STEPS=7
+TOTAL_STEPS=8
 CURRENT_STEP=0
 NODE_ROLE="gateway"  # gateway | node
 
@@ -358,7 +358,139 @@ EOF
     echo -e "${CYAN}     Truy cập từ máy khác trong LAN: http://$(hostname -I | awk '{print $1}'):$PORT${NC}"
 }
 
-# --- 🏁 CHẠY TỔNG LỰC ---
+# --- 📹 Cài Frigate NVR ---
+setup_frigate() {
+    ((CURRENT_STEP++))
+    echo -e "\n${BOLD}${YELLOW}[$CURRENT_STEP/$TOTAL_STEPS] FRIGATE NVR — AI OBJECT DETECTION${NC}"
+
+    if [[ "$NODE_ROLE" == "node" ]]; then
+        echo -e "${YELLOW}⏭ Chế độ Node — Bỏ qua Frigate (cài ở Gateway).${NC}"
+        return 0
+    fi
+
+    echo -e "${CYAN}🎥 Frigate là NVR mã nguồn mở, tích hợp AI phát hiện người/xe/vật thể.${NC}"
+    echo -e "   Yêu cầu: Docker | Khuyến nghị: máy ≥ 4GB RAM\n"
+    read -p "👉 Cài Frigate NVR không? (y/n, mặc định n): " install_frigate
+
+    if [[ ! "$install_frigate" =~ ^[Yy]$ ]]; then
+        echo -e "${YELLOW}⏭ Bỏ qua Frigate.${NC}"
+        return 0
+    fi
+
+    # Kiểm tra Docker
+    if ! command -v docker &> /dev/null; then
+        echo -e "${CYAN}🐳 Docker chưa có — cài Docker trước...${NC}"
+        run_with_process "Cài Docker" bash -c "curl -fsSL https://get.docker.com | sh"
+        if command -v systemctl &> /dev/null; then
+            systemctl enable docker > /dev/null 2>&1
+            systemctl start docker > /dev/null 2>&1
+        fi
+    fi
+
+    FRIGATE_DIR="$HOME/.greenmind/frigate"
+    mkdir -p "$FRIGATE_DIR"
+
+    # Hỏi thông tin camera để build config Frigate
+    FRIGATE_CAMERAS=""
+    echo -e "\n${CYAN}📷 Thêm camera vào Frigate (đọc từ config.env của Greenmind):${NC}"
+    echo -e "   Greenmind sẽ tự đọc các camera đã khai báo và thêm vào Frigate config."
+
+    # Đọc các camera từ config.env
+    if [ -f "/etc/greenmind/config.env" ]; then
+        while IFS= read -r line; do
+            if [[ "$line" =~ ^([A-Z0-9_]+)_RTSP=\"(.+)\"$ ]]; then
+                cam_name="${BASH_REMATCH[1]}"
+                cam_rtsp="${BASH_REMATCH[2]}"
+                cam_lower=$(echo "$cam_name" | tr '[:upper:]' '[:lower:]')
+                FRIGATE_CAMERAS+="  ${cam_lower}:
+    ffmpeg:
+      inputs:
+        - path: ${cam_rtsp}
+          roles:
+            - detect
+            - record
+    detect:
+      width: 1280
+      height: 720
+      fps: 5
+"
+                echo -e "  ${GREEN}[✓]${NC} Đã thêm: $cam_name → Frigate"
+            fi
+        done < "/etc/greenmind/config.env"
+    fi
+
+    # Sinh file cấu hình Frigate
+    cat > "$FRIGATE_DIR/config.yml" << EOF
+mqtt:
+  enabled: true
+  host: localhost
+  port: 1883
+
+cameras:
+${FRIGATE_CAMERAS:-  # Chưa có camera — thêm thủ công sau tại $FRIGATE_DIR/config.yml}
+
+record:
+  enabled: true
+  retain:
+    days: 7
+    mode: motion
+
+snapshots:
+  enabled: true
+  retain:
+    default: 14
+
+detectors:
+  cpu1:
+    type: cpu
+    num_threads: 3
+
+objects:
+  track:
+    - person
+    - car
+    - motorcycle
+    - bicycle
+EOF
+
+    echo -e "${GREEN} [✓] Tạo file cấu hình Frigate tại: $FRIGATE_DIR/config.yml${NC}"
+
+    # Tạo docker-compose cho Frigate
+    cat > "$FRIGATE_DIR/docker-compose.yml" << EOF
+services:
+  frigate:
+    container_name: frigate
+    image: ghcr.io/blakeblackshear/frigate:stable
+    restart: unless-stopped
+    shm_size: "256mb"
+    volumes:
+      - $FRIGATE_DIR/config.yml:/config/config.yml
+      - $HOME/.greenmind/frigate/storage:/media/frigate
+      - /etc/localtime:/etc/localtime:ro
+    ports:
+      - "5000:5000"   # Web UI (unauthenticated)
+      - "8971:8971"   # Web UI (authenticated)
+      - "8554:8554"   # RTSP re-stream
+    environment:
+      FRIGATE_RTSP_PASSWORD: ""
+EOF
+
+    # Khởi động Frigate
+    run_with_process "Khởi động Frigate NVR (docker pull...)" docker compose -f "$FRIGATE_DIR/docker-compose.yml" up -d
+
+    # Ghi URL Frigate vào config.env
+    echo "" >> /etc/greenmind/config.env
+    echo "# --- FRIGATE NVR ---" >> /etc/greenmind/config.env
+    echo "FRIGATE_URL=\"http://localhost:5000\"" >> /etc/greenmind/config.env
+    echo "FRIGATE_ENABLED=true" >> /etc/greenmind/config.env
+
+    echo -e "${GREEN} [✓] Frigate NVR đã chạy!${NC}"
+    echo -e "${CYAN}     Web UI: http://localhost:5000${NC}"
+    echo -e "${CYAN}     Config: $FRIGATE_DIR/config.yml${NC}"
+    echo -e "${YELLOW}     Lưu ý: Chỉnh sửa config.yml nếu cần thay đổi resolution/FPS.${NC}"
+}
+
+
 check_env
 show_intro
 select_node_role
@@ -366,6 +498,7 @@ setup_core
 setup_venv
 setup_ai_engines
 setup_config
+setup_frigate
 setup_service
 setup_dashboard
 
