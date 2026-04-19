@@ -17,7 +17,7 @@ from datetime import datetime, timedelta
 
 # ── Auto-install dependencies ─────────────────────────────────────────────────
 try:
-    from fastapi import FastAPI, Response, UploadFile, File, WebSocket, WebSocketDisconnect, Request, Depends, Cookie
+    from fastapi import FastAPI, Response, UploadFile, File, Form, WebSocket, WebSocketDisconnect, Request, Depends, Cookie
     from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
     from fastapi.middleware.cors import CORSMiddleware
     import uvicorn
@@ -29,7 +29,7 @@ except ImportError:
     subprocess.check_call([sys.executable, '-m', 'pip', 'install',
         'fastapi', 'uvicorn[standard]', 'opencv-python-headless',
         'paho-mqtt', 'requests', 'websockets', 'psutil', '-q'])
-    from fastapi import FastAPI, Response, UploadFile, File, WebSocket, WebSocketDisconnect, Request, Depends, Cookie
+    from fastapi import FastAPI, Response, UploadFile, File, Form, WebSocket, WebSocketDisconnect, Request, Depends, Cookie
     from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
     from fastapi.middleware.cors import CORSMiddleware
     import uvicorn
@@ -815,7 +815,96 @@ def index(request: Request, session: str | None = Cookie(default=None)):
             return HTMLResponse(p.read_text())
     return HTMLResponse('<h1>Greenmind</h1><p>Missing templates/index.html</p>')
 
+
+# ── Node Relay API ─────────────────────────────────────────────────────────────
+@app.post('/api/node/snapshot')
+async def node_snapshot(camera: str = Form(...), ts: int = Form(0), snapshot: UploadFile = File(...)):
+    name = camera.upper().replace('-', '_')
+    data = await snapshot.read()
+    if len(data) < 1000:
+        return JSONResponse({'error': 'invalid snapshot'}, status_code=400)
+    (SNAP_DIR / f'{name}.jpg').write_bytes(data)
+    if name not in cameras:
+        cameras[name] = {'name': name, 'rtsp': '', 'online': True, 'last_snap': time.time(), 'last_alert': None, 'alert_count': 0}
+    else:
+        cameras[name]['online'] = True
+        cameras[name]['last_snap'] = time.time()
+    log.info(f'Node snapshot: {name} ({len(data)//1024}KB)')
+    return JSONResponse({'ok': True, 'camera': name, 'size': len(data)})
+
+
+@app.post('/api/node/motion')
+async def node_motion(camera: str = Form(...), ts: int = Form(0), ssim: str = Form('0'), label: str = Form('motion'), snapshot: UploadFile = File(...)):
+    name = camera.upper().replace('-', '_')
+    data = await snapshot.read()
+    if len(data) < 1000:
+        return JSONResponse({'error': 'invalid snapshot'}, status_code=400)
+    (SNAP_DIR / f'{name}.jpg').write_bytes(data)
+    if name not in cameras:
+        cameras[name] = {'name': name, 'rtsp': '', 'online': True, 'last_snap': time.time(), 'last_alert': None, 'alert_count': 0}
+    cameras[name]['online'] = True
+    cameras[name]['last_snap'] = time.time()
+    cameras[name]['last_alert'] = time.time()
+    cameras[name]['alert_count'] = cameras[name].get('alert_count', 0) + 1
+    alert = {
+        'cam': name, 'label': label, 'label_vn': 'Phát hiện chuyển động',
+        'ts': ts or time.time(),
+        'ts_str': datetime.fromtimestamp(ts or time.time()).strftime('%d/%m/%Y %H:%M:%S'),
+        'ssim': ssim, 'snapshot_url': f'/api/snapshot/{name}', 'description': ''
+    }
+    alerts.append(alert)
+    threading.Thread(target=_process_motion_alert, args=(name, data, alert), daemon=True).start()
+    log.info(f'Motion: {name} SSIM={ssim}')
+    return JSONResponse({'ok': True, 'camera': name})
+
+def _process_motion_alert(name, data, alert):
+    try:
+        description = ai_analyze(name, f'/api/snapshot/{name}', 'motion')
+        alert['description'] = description
+        telegram_notify(name, description, f'http://localhost:{os.environ.get("GREENMIND_PORT","8765")}/api/snapshot/{name}')
+    except Exception as e:
+        log.error(f'motion alert: {e}')
+
 if __name__ == '__main__':
     port = int(os.environ.get('GREENMIND_PORT', 8765))
     log.info(f'🌿 Greenmind Dashboard → http://0.0.0.0:{port}')
     uvicorn.run(app, host='0.0.0.0', port=port, log_level='warning')
+
+@app.post('/api/node/motion')
+async def node_motion(camera: str = Form(...), ts: int = Form(0), ssim: str = Form('0'), label: str = Form('motion'), snapshot: UploadFile = File(...)):
+    name = camera.upper().replace('-', '_')
+    data = await snapshot.read()
+    if len(data) < 1000:
+        return JSONResponse({'error': 'invalid snapshot'}, status_code=400)
+    # Lưu snapshot
+    snap_path = SNAP_DIR / f'{name}.jpg'
+    snap_path.write_bytes(data)
+    # Cập nhật camera state
+    if name not in cameras:
+        cameras[name] = {'name': name, 'rtsp': '', 'online': True, 'last_snap': time.time(), 'last_alert': None, 'alert_count': 0}
+    cameras[name]['online'] = True
+    cameras[name]['last_snap'] = time.time()
+    cameras[name]['last_alert'] = time.time()
+    cameras[name]['alert_count'] = cameras[name].get('alert_count', 0) + 1
+    # Ghi alert log
+    alert = {
+        'cam': name, 'label': label, 'label_vn': 'Phát hiện chuyển động',
+        'ts': ts or time.time(),
+        'ts_str': datetime.fromtimestamp(ts or time.time()).strftime('%d/%m/%Y %H:%M:%S'),
+        'ssim': ssim,
+        'snapshot_url': f'/api/snapshot/{name}',
+        'description': ''
+    }
+    alerts.append(alert)
+    # Trigger AI + Telegram trong background
+    threading.Thread(target=_process_motion_alert, args=(name, data, alert), daemon=True).start()
+    log.info(f'🚨 Motion: {name} SSIM={ssim}')
+    return JSONResponse({'ok': True, 'camera': name})
+
+def _process_motion_alert(name, data, alert):
+    try:
+        description = ai_analyze(name, f'/api/snapshot/{name}', 'motion')
+        alert['description'] = description
+        telegram_notify(name, description, f'http://localhost:{os.environ.get(GREENMIND_PORT,8765)}/api/snapshot/{name}')
+    except Exception as e:
+        log.error(f'motion alert processing: {e}')
