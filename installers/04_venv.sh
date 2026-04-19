@@ -4,7 +4,6 @@
 # =================================================================
 
 setup_venv() {
-    ((CURRENT_STEP++))
     echo -e "\n${BOLD}${YELLOW}[$CURRENT_STEP/$TOTAL_STEPS] THIẾT LẬP MÔI TRƯỜNG PYTHON${NC}"
 
     mkdir -p "$GREENMIND_DIR"

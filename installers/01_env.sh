@@ -22,6 +22,8 @@ show_intro() {
     echo "  \____|_|  \___|\___|_| |_||_|  |_|_|_| |_|\__,_|"
     echo -e "${NC}"
     echo -e "${YELLOW}🌟 CHÀO MỪNG ĐẾN VỚI TRÌNH CÀI ĐẶT GREENMIND AI (v3.2)${NC}"
+    echo -e ""
+    echo -e "  Các bước cài đặt:"
     echo -e "  ${BLUE}1.${NC} 📦 Thư viện lõi (Python 3, Node.js, FFMpeg)"
     echo -e "  ${BLUE}2.${NC} 🐍 Môi trường ảo (VENV) An toàn"
     echo -e "  ${BLUE}3.${NC} 🤖 AI Engine (Local Ollama hoặc Cloud API)"
@@ -32,6 +34,20 @@ show_intro() {
     echo -e "  ${BLUE}8.${NC} 🚀 Service chạy ngầm tự động"
     echo -e "  ${BLUE}9.${NC} 📊 Dashboard Web"
     echo ""
-    read -p "👉 Zai đã sẵn sàng chưa? (Nhấn ENTER để bắt đầu)... "
+    echo -e "${CYAN}⚡ CHỌN CHẾ ĐỘ CÀI ĐẶT:${NC}"
+    echo -e "  ${BLUE}1)${NC} 🚀 Tự động  — Cài toàn bộ, chỉ hỏi thông tin cần thiết"
+    echo -e "  ${BLUE}2)${NC} 🔧 Từng bước — Xác nhận trước mỗi bước, linh hoạt hơn"
+    echo ""
+    read -p "👉 Chọn chế độ (1/2, mặc định 1): " _mode_choice
+    case "$_mode_choice" in
+        2)
+            export INSTALL_MODE="step"
+            echo -e "${GREEN} [✓] Chế độ: Từng bước${NC}"
+            ;;
+        *)
+            export INSTALL_MODE="auto"
+            echo -e "${GREEN} [✓] Chế độ: Tự động${NC}"
+            ;;
+    esac
     echo ""
 }

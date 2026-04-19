@@ -4,7 +4,6 @@
 # =================================================================
 
 setup_service() {
-    ((CURRENT_STEP++))
     echo -e "\n${BOLD}${YELLOW}[$CURRENT_STEP/$TOTAL_STEPS] ĐĂNG KÝ DỊCH VỤ CHẠY NGẦM${NC}"
 
     if [[ "$OS_TYPE" == "Linux" ]]; then

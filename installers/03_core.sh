@@ -4,7 +4,6 @@
 # =================================================================
 
 setup_core() {
-    ((CURRENT_STEP++))
     echo -e "\n${BOLD}${YELLOW}[$CURRENT_STEP/$TOTAL_STEPS] CHUẨN BỊ NỀN TẢNG HỆ THỐNG${NC}"
     if [[ "$OS_TYPE" == "Linux" ]]; then
         run_with_process "Cập nhật danh sách gói (apt update)" apt-get update -y

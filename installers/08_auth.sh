@@ -4,7 +4,6 @@
 # =================================================================
 
 setup_auth() {
-    ((CURRENT_STEP++))
     echo -e "\n${BOLD}${YELLOW}[$CURRENT_STEP/$TOTAL_STEPS] BẢO MẬT DASHBOARD${NC}"
 
     if [[ "$NODE_ROLE" == "node" ]]; then

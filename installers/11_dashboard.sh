@@ -4,7 +4,6 @@
 # =================================================================
 
 setup_dashboard() {
-    ((CURRENT_STEP++))
     echo -e "\n${BOLD}${YELLOW}[$CURRENT_STEP/$TOTAL_STEPS] CÀI ĐẶT DASHBOARD WEB${NC}"
 
     if [[ "$NODE_ROLE" == "node" ]]; then

@@ -4,7 +4,6 @@
 # =================================================================
 
 setup_frigate() {
-    ((CURRENT_STEP++))
     echo -e "\n${BOLD}${YELLOW}[$CURRENT_STEP/$TOTAL_STEPS] FRIGATE NVR — AI OBJECT DETECTION${NC}"
 
     if [[ "$NODE_ROLE" == "node" ]]; then

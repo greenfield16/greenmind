@@ -4,7 +4,6 @@
 # =================================================================
 
 setup_config() {
-    ((CURRENT_STEP++))
     echo -e "\n${BOLD}${YELLOW}[$CURRENT_STEP/$TOTAL_STEPS] THIẾT LẬP THIẾT BỊ & CAMERA${NC}"
 
     mkdir -p /etc/greenmind
