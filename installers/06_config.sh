@@ -11,8 +11,16 @@ setup_config() {
     if [ ! -f "$CONFIG_FILE" ]; then
         cat <<EOF > "$CONFIG_FILE"
 # GREENMIND SYSTEM CORE CONFIG
+# =================================================================
+# AI ENGINE: gemini | nvidia | ollama model name
 AI_ENGINE=$LOCAL_MODEL
-GEMINI_KEY=YOUR_KEY_HERE
+
+# Gemini API Key — https://aistudio.google.com/app/apikey
+GEMINI_KEY=YOUR_GEMINI_KEY
+
+# NVIDIA NIM API Key — https://build.nvidia.com/google/gemma-4-31b-it
+NVIDIA_KEY=YOUR_NVIDIA_KEY
+
 MQTT_BROKER=localhost
 MQTT_PORT=1883
 FRIGATE_URL=http://localhost:5000

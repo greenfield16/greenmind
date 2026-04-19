@@ -109,6 +109,8 @@ from fastapi import HTTPException
 MQTT_BROKER   = cfg.get('MQTT_BROKER', 'localhost')
 MQTT_PORT     = int(cfg.get('MQTT_PORT', 1883))
 GEMINI_KEY    = cfg.get('GEMINI_KEY', '')
+NVIDIA_KEY    = cfg.get('NVIDIA_KEY', '')
+AI_ENGINE     = cfg.get('AI_ENGINE', 'gemini')   # gemini | nvidia | ollama
 FRIGATE_URL   = cfg.get('FRIGATE_URL', 'http://localhost:5000')
 TELEGRAM_TOKEN = cfg.get('TELEGRAM_TOKEN', '')
 TELEGRAM_CHAT  = cfg.get('TELEGRAM_CHAT_ID', '')
@@ -189,41 +191,86 @@ class WSManager:
 
 ws_manager = WSManager()
 
-# ── Gemini AI analyze ─────────────────────────────────────────────────────────
-def gemini_analyze(cam_name: str, snapshot_url: str, event_type: str) -> str:
-    """Gửi snapshot cho Gemini, nhận mô tả ngữ cảnh."""
-    if not GEMINI_KEY or GEMINI_KEY == 'YOUR_KEY_HERE':
-        return f'{event_type} tại {cam_name}'
+# ── AI analyze (Gemini / NVIDIA NIM / Ollama) ─────────────────────────────────
+def ai_analyze(cam_name: str, snapshot_url: str, event_type: str) -> str:
+    """Gửi snapshot cho AI engine, nhận mô tả ngữ cảnh tiếng Việt."""
+    prompt = (
+        f'Camera an ninh [{cam_name}] vừa phát hiện: {event_type}. '
+        f'Hãy mô tả ngắn gọn (1-2 câu tiếng Việt) những gì thấy trong ảnh, '
+        f'tập trung vào đối tượng được phát hiện và mức độ đáng chú ý.'
+    )
     try:
-        # Tải ảnh
         img_resp = requests.get(snapshot_url, timeout=5)
         if img_resp.status_code != 200:
             return f'{event_type} tại {cam_name}'
         import base64
         img_b64 = base64.b64encode(img_resp.content).decode()
 
-        prompt = (
-            f'Camera an ninh [{cam_name}] vừa phát hiện: {event_type}. '
-            f'Hãy mô tả ngắn gọn (1-2 câu tiếng Việt) những gì thấy trong ảnh, '
-            f'tập trung vào đối tượng được phát hiện và mức độ đáng chú ý.'
-        )
-        payload = {
-            'contents': [{
-                'parts': [
-                    {'text': prompt},
-                    {'inline_data': {'mime_type': 'image/jpeg', 'data': img_b64}}
-                ]
-            }]
-        }
-        r = requests.post(
-            f'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_KEY}',
-            json=payload, timeout=10
-        )
-        if r.status_code == 200:
-            return r.json()['candidates'][0]['content']['parts'][0]['text'].strip()
+        # ── NVIDIA NIM ────────────────────────────────────────────────────
+        if AI_ENGINE == 'nvidia' and NVIDIA_KEY and NVIDIA_KEY != 'YOUR_NVIDIA_KEY':
+            payload = {
+                'model': 'google/gemma-4-31b-it',
+                'messages': [{
+                    'role': 'user',
+                    'content': [
+                        {'type': 'text', 'text': prompt},
+                        {'type': 'image_url', 'image_url': {
+                            'url': f'data:image/jpeg;base64,{img_b64}'
+                        }}
+                    ]
+                }],
+                'max_tokens': 256,
+                'temperature': 0.4,
+            }
+            r = requests.post(
+                'https://integrate.api.nvidia.com/v1/chat/completions',
+                headers={'Authorization': f'Bearer {NVIDIA_KEY}',
+                         'Content-Type': 'application/json'},
+                json=payload, timeout=15
+            )
+            if r.status_code == 200:
+                return r.json()['choices'][0]['message']['content'].strip()
+            log.warning(f'NVIDIA NIM error: {r.status_code} {r.text[:200]}')
+
+        # ── Gemini ────────────────────────────────────────────────────────
+        elif AI_ENGINE in ('gemini', '') and GEMINI_KEY and GEMINI_KEY != 'YOUR_KEY_HERE':
+            payload = {
+                'contents': [{
+                    'parts': [
+                        {'text': prompt},
+                        {'inline_data': {'mime_type': 'image/jpeg', 'data': img_b64}}
+                    ]
+                }]
+            }
+            r = requests.post(
+                f'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_KEY}',
+                json=payload, timeout=10
+            )
+            if r.status_code == 200:
+                return r.json()['candidates'][0]['content']['parts'][0]['text'].strip()
+            log.warning(f'Gemini error: {r.status_code}')
+
+        # ── Ollama (local) ────────────────────────────────────────────────
+        elif AI_ENGINE not in ('gemini', 'nvidia'):
+            payload = {
+                'model': AI_ENGINE,
+                'prompt': prompt,
+                'images': [img_b64],
+                'stream': False
+            }
+            r = requests.post('http://localhost:11434/api/generate',
+                              json=payload, timeout=30)
+            if r.status_code == 200:
+                return r.json().get('response', '').strip()
+
     except Exception as e:
-        log.warning(f'Gemini error: {e}')
+        log.warning(f'AI analyze error: {e}')
+
     return f'{event_type} tại {cam_name}'
+
+# Alias cũ để backward compat
+def gemini_analyze(cam_name, snapshot_url, event_type):
+    return ai_analyze(cam_name, snapshot_url, event_type)
 
 # ── Telegram notify ───────────────────────────────────────────────────────────
 def telegram_notify(cam_name: str, description: str, snapshot_url: str):
