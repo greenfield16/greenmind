@@ -23,6 +23,24 @@ setup_dashboard() {
     local PORT="$GREENMIND_PORT"
 
     if [[ "$OS_TYPE" == "Linux" ]]; then
+        # Đảm bảo config.env tồn tại trước khi tạo service
+        mkdir -p /etc/greenmind
+        if [ ! -f "$CONFIG_FILE" ]; then
+            cat > "$CONFIG_FILE" <<CFGEOF
+GREENMIND_ROLE=gateway
+GREENMIND_PORT=$PORT
+AI_ENGINE=gemini
+GEMINI_KEY=
+NVIDIA_KEY=
+MQTT_BROKER=localhost
+MQTT_PORT=1883
+FRIGATE_URL=http://localhost:5000
+TELEGRAM_TOKEN=
+TELEGRAM_CHAT_ID=
+CFGEOF
+            chmod 600 "$CONFIG_FILE"
+        fi
+
         cat > /etc/systemd/system/greenmind-dashboard.service <<EOF
 [Unit]
 Description=Greenmind Dashboard
