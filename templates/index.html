@@ -34,7 +34,23 @@
   <div class="stat"><div class="num" id="s-on">—</div><label>ONLINE</label></div>
   <div class="stat warn"><div class="num" id="s-off">—</div><label>OFFLINE</label></div>
   <div class="stat err"><div class="num" id="s-alerts">0</div><label>CẢNH BÁO HÔM NAY</label></div>
-  <div class="stat-sep">Cập nhật: <span id="last-upd" style="color:#4caf7d">—</span></div>
+  <div class="stat" style="cursor:pointer" onclick="openHealth()" title="Xem chi tiết hệ thống">
+    <div class="num" id="s-cpu" style="font-size:16px">—</div><label>CPU / RAM</label>
+  </div>
+  <div class="stat-sep">
+    <span id="update-badge" style="display:none;background:#f5a623;color:#000;font-size:11px;font-weight:700;padding:3px 8px;border-radius:4px;margin-right:10px;cursor:pointer" onclick="openHealth()">🔄 Có update!</span>
+    Cập nhật: <span id="last-upd" style="color:#4caf7d">—</span>
+  </div>
+</div>
+
+<!-- Health Modal -->
+<div class="popup" id="health-popup" onclick="if(event.target===this)closeHealth()">
+  <div class="popup-box" style="width:520px">
+    <h3>🖥 System Health<button class="popup-close" onclick="closeHealth()">✕</button></h3>
+    <div id="health-body">
+      <div style="color:#555;text-align:center;padding:20px">Đang tải...</div>
+    </div>
+  </div>
 </div>
 
 <!-- Tabs -->
@@ -175,6 +191,110 @@ let offlineOnly = false, curTab = 'grid';
 let editMode = false, selDrag = null;
 let fp = { image: null, cameras: {} }, fpImgEl = null;
 let selCam = null, newAlertCount = 0, frigateOnline = false;
+
+// ── Health & Version check ─────────────────────────────────────────────────
+let healthData = {};
+
+async function fetchHealth() {
+  try {
+    const r = await fetch('/api/health');
+    healthData = await r.json();
+
+    // CPU/RAM mini display
+    const cpu = healthData.cpu_percent ?? '—';
+    const ram = healthData.ram_percent ?? '—';
+    document.getElementById('s-cpu').textContent = `${cpu}% / ${ram}%`;
+
+    // Màu cảnh báo
+    const cpuEl = document.getElementById('s-cpu');
+    cpuEl.style.color = cpu > 85 ? '#e74c3c' : cpu > 60 ? '#f5a623' : '#4caf7d';
+
+    // Update badge
+    const badge = document.getElementById('update-badge');
+    if (healthData.update_available) {
+      badge.style.display = 'inline-block';
+      badge.textContent = `🔄 v${healthData.latest_version} available`;
+    } else {
+      badge.style.display = 'none';
+    }
+  } catch (_) {}
+}
+
+function openHealth() {
+  document.getElementById('health-popup').classList.add('open');
+  renderHealth();
+}
+
+function closeHealth() {
+  document.getElementById('health-popup').classList.remove('open');
+}
+
+function renderHealth() {
+  const d = healthData;
+  if (!d.version) { fetchHealth().then(renderHealth); return; }
+
+  const uptime = d.uptime_s
+    ? (() => {
+        const h = Math.floor(d.uptime_s / 3600);
+        const m = Math.floor((d.uptime_s % 3600) / 60);
+        return h > 24 ? `${Math.floor(h/24)}d ${h%24}h` : `${h}h ${m}m`;
+      })()
+    : '—';
+
+  const bar = (pct, color) => `
+    <div style="background:#252836;border-radius:4px;height:8px;overflow:hidden;margin-top:4px">
+      <div style="width:${Math.min(pct,100)}%;height:100%;background:${pct>85?'#e74c3c':pct>60?'#f5a623':color};border-radius:4px;transition:.5s"></div>
+    </div>`;
+
+  document.getElementById('health-body').innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+
+      <div style="background:#13151f;border-radius:8px;padding:12px">
+        <div style="font-size:11px;color:#666;margin-bottom:4px">CPU</div>
+        <div style="font-size:22px;font-weight:700;color:${(d.cpu_percent??0)>85?'#e74c3c':(d.cpu_percent??0)>60?'#f5a623':'#4caf7d'}">${d.cpu_percent ?? '—'}%</div>
+        ${d.cpu_percent != null ? bar(d.cpu_percent, '#4caf7d') : ''}
+      </div>
+
+      <div style="background:#13151f;border-radius:8px;padding:12px">
+        <div style="font-size:11px;color:#666;margin-bottom:4px">RAM</div>
+        <div style="font-size:22px;font-weight:700;color:${(d.ram_percent??0)>85?'#e74c3c':(d.ram_percent??0)>60?'#f5a623':'#4caf7d'}">${d.ram_percent ?? '—'}%</div>
+        <div style="font-size:11px;color:#555">${d.ram_used_mb ?? '—'} / ${d.ram_total_mb ?? '—'} MB</div>
+        ${d.ram_percent != null ? bar(d.ram_percent, '#4caf7d') : ''}
+      </div>
+
+      <div style="background:#13151f;border-radius:8px;padding:12px">
+        <div style="font-size:11px;color:#666;margin-bottom:4px">DISK</div>
+        <div style="font-size:22px;font-weight:700;color:${(d.disk_percent??0)>90?'#e74c3c':(d.disk_percent??0)>75?'#f5a623':'#4caf7d'}">${d.disk_percent ?? '—'}%</div>
+        <div style="font-size:11px;color:#555">${d.disk_used_gb ?? '—'} / ${d.disk_total_gb ?? '—'} GB</div>
+        ${d.disk_percent != null ? bar(d.disk_percent, '#4caf7d') : ''}
+      </div>
+
+      <div style="background:#13151f;border-radius:8px;padding:12px">
+        <div style="font-size:11px;color:#666;margin-bottom:4px">UPTIME</div>
+        <div style="font-size:22px;font-weight:700;color:#4caf7d">${uptime}</div>
+        <div style="font-size:11px;color:#555">WS: ${d.ws_connections ?? 0} client</div>
+      </div>
+    </div>
+
+    <div style="border-top:1px solid #252836;padding-top:12px">
+      ${[
+        ['Phiên bản', `v${d.version} ${d.update_available ? `<span style="background:#f5a623;color:#000;font-size:10px;padding:1px 6px;border-radius:3px;margin-left:6px">→ v${d.latest_version}</span>` : '<span style="color:#4caf7d;font-size:11px">✓ Mới nhất</span>'}`],
+        ['Camera', `${d.cameras_online} / ${d.cameras_total} online`],
+        ['Cảnh báo hôm nay', d.alerts_today ?? 0],
+        ['MQTT Broker', d.mqtt_broker ?? '—'],
+        ['Frigate', frigateOnline ? '✅ Online' : '❌ Offline'],
+      ].map(([k,v]) => `
+        <div class="popup-row"><span>${k}</span><span>${v}</span></div>
+      `).join('')}
+    </div>
+
+    ${d.update_available ? `
+    <div style="background:#f5a62322;border:1px solid #f5a62344;border-radius:8px;padding:12px;margin-top:12px;font-size:13px;color:#f5a623">
+      🔄 Có phiên bản mới <b>v${d.latest_version}</b>! Chạy lại install script để cập nhật:<br>
+      <code style="font-size:11px;color:#ddd">bash <(curl -fsSL https://raw.githubusercontent.com/greenfield16/greenmind/main/greenmind_install.sh)</code>
+    </div>` : ''}
+  `;
+}
 
 // ── Auth ──────────────────────────────────────────────────────────────────
 async function logout() {
@@ -670,11 +790,13 @@ requestNotifPermission();
 setInterval(() => document.getElementById('clock').textContent = new Date().toLocaleTimeString('vi-VN'), 1000);
 setInterval(fetchCameras, 15000);
 setInterval(fetchFrigateStatus, 30000);
+setInterval(fetchHealth, 60000);  // health check mỗi 1 phút
 
 connectWS();
 fetchCameras();
 fetchFrigateStatus();
 fetchAlerts();
+fetchHealth();
 </script>
 </body>
 </html>

@@ -28,7 +28,7 @@ except ImportError:
     import subprocess, sys
     subprocess.check_call([sys.executable, '-m', 'pip', 'install',
         'fastapi', 'uvicorn[standard]', 'opencv-python-headless',
-        'paho-mqtt', 'requests', 'websockets', '-q'])
+        'paho-mqtt', 'requests', 'websockets', 'psutil', '-q'])
     from fastapi import FastAPI, Response, UploadFile, File, WebSocket, WebSocketDisconnect, Request, Depends, Cookie
     from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
     from fastapi.middleware.cors import CORSMiddleware
@@ -517,7 +517,92 @@ def clear_alerts():
     except: pass
     return JSONResponse({'ok': True})
 
-# ── Frigate proxy info ────────────────────────────────────────────────────────
+# ── Version & Health check ────────────────────────────────────────────────────
+GREENMIND_VERSION = '2.1'
+
+def get_latest_version() -> str:
+    try:
+        r = requests.get(
+            'https://raw.githubusercontent.com/greenfield16/greenmind/main/VERSION',
+            timeout=5
+        )
+        if r.status_code == 200:
+            return r.text.strip()
+    except:
+        pass
+    return ''
+
+def get_system_health() -> dict:
+    health = {}
+    try:
+        import shutil, psutil
+        # CPU
+        health['cpu_percent'] = psutil.cpu_percent(interval=0.5)
+        # RAM
+        mem = psutil.virtual_memory()
+        health['ram_used_mb']  = round(mem.used  / 1024 / 1024)
+        health['ram_total_mb'] = round(mem.total / 1024 / 1024)
+        health['ram_percent']  = mem.percent
+        # Disk
+        disk = psutil.disk_usage(str(DATA_DIR))
+        health['disk_used_gb']  = round(disk.used  / 1024 / 1024 / 1024, 1)
+        health['disk_total_gb'] = round(disk.total / 1024 / 1024 / 1024, 1)
+        health['disk_percent']  = disk.percent
+        # Uptime
+        health['uptime_s'] = int(time.time() - psutil.boot_time())
+    except ImportError:
+        # psutil chưa cài — fallback sang /proc
+        try:
+            with open('/proc/meminfo') as f:
+                lines = {l.split(':')[0]: int(l.split()[1]) for l in f if ':' in l}
+            total = lines.get('MemTotal', 0)
+            avail = lines.get('MemAvailable', 0)
+            used  = total - avail
+            health['ram_used_mb']  = round(used  / 1024)
+            health['ram_total_mb'] = round(total / 1024)
+            health['ram_percent']  = round(used / total * 100, 1) if total else 0
+        except: pass
+        try:
+            import shutil
+            disk = shutil.disk_usage(str(DATA_DIR))
+            health['disk_used_gb']  = round(disk.used  / 1024**3, 1)
+            health['disk_total_gb'] = round(disk.total / 1024**3, 1)
+            health['disk_percent']  = round(disk.used / disk.total * 100, 1) if disk.total else 0
+        except: pass
+        try:
+            with open('/proc/loadavg') as f:
+                health['cpu_percent'] = round(float(f.read().split()[0]) * 100 / os.cpu_count(), 1)
+        except: pass
+        try:
+            with open('/proc/uptime') as f:
+                health['uptime_s'] = int(float(f.read().split()[0]))
+        except: pass
+    return health
+
+@app.get('/api/health')
+def get_health():
+    health = get_system_health()
+    # Version check (cache 1h)
+    latest = get_latest_version()
+    health['version']         = GREENMIND_VERSION
+    health['latest_version']  = latest
+    health['update_available'] = bool(latest and latest != GREENMIND_VERSION)
+    health['cameras_total']   = len(cameras)
+    health['cameras_online']  = sum(1 for c in cameras.values() if c.get('online'))
+    health['alerts_total']    = len(alerts)
+    health['alerts_today']    = sum(1 for a in alerts if isToday_py(a.get('ts', 0)))
+    health['ws_connections']  = len(ws_manager.connections)
+    health['mqtt_broker']     = MQTT_BROKER
+    return JSONResponse(health)
+
+def isToday_py(ts: float) -> bool:
+    from datetime import date
+    try:
+        return datetime.fromtimestamp(ts).date() == date.today()
+    except:
+        return False
+
+
 @app.get('/api/frigate/status')
 def frigate_status():
     try:

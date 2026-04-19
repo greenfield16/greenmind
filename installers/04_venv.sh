@@ -15,5 +15,5 @@ setup_venv() {
     run_with_process "Nâng cấp PIP" "$VENV_PATH/bin/pip" install --upgrade pip
     run_with_process "Cài thư viện AI & Camera" "$VENV_PATH/bin/pip" install \
         opencv-python numpy requests google-generativeai paho-mqtt ezviz-python \
-        fastapi "uvicorn[standard]" opencv-python-headless websockets -q
+        fastapi "uvicorn[standard]" opencv-python-headless websockets psutil -q
 }
