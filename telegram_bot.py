@@ -107,6 +107,36 @@ def ai_analyze_image(photo_bytes, cam_name):
         f'Trả lời bằng tiếng Việt, tối đa 3 câu.'
     )
 
+    if engine == 'openrouter':
+        key   = cfg2.get('OPENROUTER_KEY', '')
+        model = cfg2.get('OPENROUTER_MODEL', 'google/gemma-4-31b-it:free')
+        if not key:
+            return '⚠️ Chưa cấu hình OPENROUTER_KEY.'
+        try:
+            import PIL.Image, io
+            small = resize_image(photo_bytes, max_width=640)
+            img_b64 = base64.b64encode(small).decode()
+            resp = requests.post(
+                'https://openrouter.ai/api/v1/chat/completions',
+                headers={'Authorization': f'Bearer {key}', 'Content-Type': 'application/json'},
+                json={
+                    'model': model,
+                    'messages': [{
+                        'role': 'user',
+                        'content': [
+                            {'type': 'text', 'text': prompt},
+                            {'type': 'image_url', 'image_url': {'url': f'data:image/jpeg;base64,{img_b64}'}}
+                        ]
+                    }]
+                },
+                timeout=60
+            )
+            if resp.status_code == 200:
+                return resp.json()['choices'][0]['message']['content'].strip()
+            return f'⚠️ OpenRouter trả {resp.status_code}: {resp.text[:100]}'
+        except Exception as e:
+            return f'⚠️ OpenRouter lỗi: {str(e)[:100]}'
+
     if engine == 'gemini':
         key = cfg2.get('GEMINI_KEY', '')
         if not key or key == 'YOUR_GEMINI_KEY':
