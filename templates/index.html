@@ -19,6 +19,7 @@
     <span id="frigate-status"><span class="dot red" id="frigate-dot"></span>Frigate: —</span>
     <span>WS: <span id="ws-status" style="color:#e74c3c">—</span></span>
     <span>🕐 <span id="clock">--:--:--</span></span>
+    <button onclick="logout()" style="background:transparent;border:1px solid #333;color:#888;padding:5px 12px;border-radius:5px;cursor:pointer;font-size:12px">🚪 Đăng xuất</button>
   </div>
 </div>
 
@@ -131,6 +132,12 @@ let offlineOnly = false, curTab = 'grid';
 let editMode = false, selDrag = null;
 let fp = { image: null, cameras: {} }, fpImgEl = null;
 let selCam = null, newAlertCount = 0, frigateOnline = false;
+
+// ── Auth ──────────────────────────────────────────────────────────────────
+async function logout() {
+  await fetch('/auth/logout', { method: 'POST' });
+  location.href = '/login';
+}
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 function isToday(ts) {

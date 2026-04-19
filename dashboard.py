@@ -10,15 +10,15 @@ Luồng alert:
   Frigate detect → MQTT event → Gemini phân tích → WS alert + Telegram
 """
 
-import os, re, time, threading, json, asyncio, logging
+import os, re, time, threading, json, asyncio, logging, hashlib, secrets
 from pathlib import Path
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, timedelta
 
 # ── Auto-install dependencies ─────────────────────────────────────────────────
 try:
-    from fastapi import FastAPI, Response, UploadFile, File, WebSocket, WebSocketDisconnect
-    from fastapi.responses import HTMLResponse, JSONResponse
+    from fastapi import FastAPI, Response, UploadFile, File, WebSocket, WebSocketDisconnect, Request, Depends, Cookie
+    from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
     from fastapi.middleware.cors import CORSMiddleware
     import uvicorn
     import cv2
@@ -29,8 +29,8 @@ except ImportError:
     subprocess.check_call([sys.executable, '-m', 'pip', 'install',
         'fastapi', 'uvicorn[standard]', 'opencv-python-headless',
         'paho-mqtt', 'requests', 'websockets', '-q'])
-    from fastapi import FastAPI, Response, UploadFile, File, WebSocket, WebSocketDisconnect
-    from fastapi.responses import HTMLResponse, JSONResponse
+    from fastapi import FastAPI, Response, UploadFile, File, WebSocket, WebSocketDisconnect, Request, Depends, Cookie
+    from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
     from fastapi.middleware.cors import CORSMiddleware
     import uvicorn
     import cv2
@@ -66,6 +66,45 @@ def load_env():
     return cfg
 
 cfg = load_env()
+
+# ── Auth config ───────────────────────────────────────────────────────────────
+AUTH_ENABLED  = cfg.get('DASHBOARD_AUTH', 'false').lower() == 'true'
+AUTH_USER     = cfg.get('DASHBOARD_USER', 'admin')
+AUTH_HASH     = cfg.get('DASHBOARD_PASS_HASH', '')   # salt:sha256
+AUTH_SECRET   = cfg.get('DASHBOARD_SECRET', secrets.token_hex(32))
+# Sessions: token → expiry timestamp
+_sessions: dict[str, float] = {}
+SESSION_TTL = 60 * 60 * 8  # 8 giờ
+
+def _verify_password(password: str) -> bool:
+    if not AUTH_HASH or ':' not in AUTH_HASH:
+        return True  # chưa set pass → cho qua
+    salt, stored = AUTH_HASH.split(':', 1)
+    h = hashlib.sha256((salt + password).encode()).hexdigest()
+    return h == stored
+
+def _create_session() -> str:
+    token = secrets.token_urlsafe(32)
+    _sessions[token] = time.time() + SESSION_TTL
+    return token
+
+def _valid_session(token: str | None) -> bool:
+    if not AUTH_ENABLED:
+        return True
+    if not token or token not in _sessions:
+        return False
+    if _sessions[token] < time.time():
+        del _sessions[token]
+        return False
+    return True
+
+def require_auth(request: Request, session: str | None = Cookie(default=None)):
+    if not _valid_session(session):
+        raise HTTPException(status_code=302, headers={'Location': '/login'})
+    return True
+
+# HTTPException cần import thêm
+from fastapi import HTTPException
 
 MQTT_BROKER   = cfg.get('MQTT_BROKER', 'localhost')
 MQTT_PORT     = int(cfg.get('MQTT_PORT', 1883))
@@ -535,9 +574,71 @@ async def save_layout(request_data: dict):
     save_floorplan(fp)
     return JSONResponse({'ok': True, 'saved': len(request_data)})
 
+# ── Login page ────────────────────────────────────────────────────────────────
+@app.get('/login', response_class=HTMLResponse)
+def login_page():
+    return HTMLResponse('''<!DOCTYPE html>
+<html lang="vi"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>🌿 Greenmind — Đăng nhập</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0f1117;display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:'Segoe UI',sans-serif}
+.box{background:#1a1d27;border:1px solid #2a2d3a;border-radius:14px;padding:36px 32px;width:360px;max-width:95vw}
+h1{color:#4caf7d;font-size:22px;margin-bottom:6px;text-align:center}
+p{color:#666;font-size:13px;text-align:center;margin-bottom:28px}
+label{color:#aaa;font-size:12px;display:block;margin-bottom:5px}
+input{width:100%;background:#13151f;border:1px solid #2a2d3a;border-radius:7px;padding:10px 14px;color:#ddd;font-size:14px;outline:none;margin-bottom:16px}
+input:focus{border-color:#4caf7d}
+button{width:100%;background:#4caf7d;color:#fff;border:none;border-radius:7px;padding:11px;font-size:15px;font-weight:600;cursor:pointer}
+button:hover{background:#3d9e6e}
+.err{background:#e74c3c22;border:1px solid #e74c3c44;color:#e74c3c;border-radius:6px;padding:9px 14px;font-size:13px;margin-bottom:14px;display:none}
+</style></head>
+<body><div class="box">
+<h1>🌿 GREENMIND</h1>
+<p>AI CCTV Dashboard</p>
+<div class="err" id="err">Sai tên đăng nhập hoặc mật khẩu.</div>
+<form onsubmit="doLogin(event)">
+  <label>Tên đăng nhập</label>
+  <input type="text" id="u" autocomplete="username" autofocus>
+  <label>Mật khẩu</label>
+  <input type="password" id="p" autocomplete="current-password">
+  <button type="submit">Đăng nhập</button>
+</form></div>
+<script>
+async function doLogin(e){
+  e.preventDefault();
+  const r = await fetch('/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({username:document.getElementById('u').value, password:document.getElementById('p').value})});
+  if(r.ok){ location.href='/'; }
+  else{ document.getElementById('err').style.display='block'; }
+}
+</script></body></html>''')
+
+@app.post('/auth/login')
+async def do_login(data: dict):
+    username = data.get('username', '')
+    password = data.get('password', '')
+    if username == AUTH_USER and _verify_password(password):
+        token = _create_session()
+        resp = JSONResponse({'ok': True})
+        resp.set_cookie('session', token, httponly=True, max_age=SESSION_TTL)
+        return resp
+    raise HTTPException(status_code=401, detail='Invalid credentials')
+
+@app.post('/auth/logout')
+async def do_logout(session: str | None = Cookie(default=None)):
+    if session and session in _sessions:
+        del _sessions[session]
+    resp = JSONResponse({'ok': True})
+    resp.delete_cookie('session')
+    return resp
+
 # ── Frontend ──────────────────────────────────────────────────────────────────
 @app.get('/', response_class=HTMLResponse)
-def index():
+def index(request: Request, session: str | None = Cookie(default=None)):
+    if AUTH_ENABLED and not _valid_session(session):
+        return RedirectResponse('/login')
     for p in [DATA_DIR / 'templates' / 'index.html',
               Path(__file__).parent / 'templates' / 'index.html']:
         if p.exists():
