@@ -1,30 +1,19 @@
 #!/bin/bash
-# =================================================================
-# 🌿 GREENMIND — Step 2: Chọn vai trò Gateway / Node
-# =================================================================
+# 🌿 02_role.sh — Chọn vai trò
 
-select_node_role() {
-    ((CURRENT_STEP++))
-    echo -e "\n${BOLD}${YELLOW}[$CURRENT_STEP/$TOTAL_STEPS] VAI TRÒ CỦA MÁY NÀY${NC}"
-    echo ""
-    echo -e "  ${BLUE}1)${NC} 🌐 Gateway  — Não chính: cài đầy đủ AI, kết nối Telegram/WhatsApp"
-    echo -e "               Phù hợp: Mac Mini, VPS, PC"
-    echo -e "  ${BLUE}2)${NC} 📡 Node     — Tai mắt: cài nhẹ, chuyên camera/cảm biến/relay"
-    echo -e "               Phù hợp: Tinkerboard, Raspberry Pi, máy yếu"
-    echo ""
-    read -p "👉 Chọn vai trò (1/2, mặc định 1): " role_choice </dev/tty
-    case "$role_choice" in
-        2)
-            export NODE_ROLE="node"
-            echo -e "${GREEN} [✓] Chế độ NODE — Sẽ bỏ qua cài AI Engine nặng.${NC}"
-            read -p "Nhập IP/Domain của Gateway (VD: 192.168.1.100 hoặc myhome.ddns.net): " GATEWAY_ADDR </dev/tty
-            read -p "Nhập Pairing Token từ Gateway: " GATEWAY_TOKEN </dev/tty
-            export GATEWAY_ADDR GATEWAY_TOKEN
-            ;;
-        *)
-            export NODE_ROLE="gateway"
-            echo -e "${GREEN} [✓] Chế độ GATEWAY — Cài đầy đủ.${NC}"
-            ;;
-    esac
-    echo ""
-}
+show_progress 1 6 "Chọn vai trò"
+
+echo -e "\n${BOLD}Chọn vai trò cài đặt:${NC}"
+echo "  1) Gateway — Máy chủ trung tâm (AI, Dashboard, Telegram)"
+echo "     Yêu cầu: RAM ≥ 2GB, có IP public hoặc domain"
+echo ""
+echo "  2) Node    — Hub thiết bị tại địa điểm (Camera, Cảm biến, Chấm công...)"
+echo "     Yêu cầu: RAM ≥ 512MB, cùng LAN với thiết bị"
+echo ""
+read -rp "Chọn [1/2]: " ROLE_CHOICE
+
+case "$ROLE_CHOICE" in
+    1) export ROLE=gateway; print_success "Vai trò: Gateway" ;;
+    2) export ROLE=node;    print_success "Vai trò: Node" ;;
+    *) print_error "Lựa chọn không hợp lệ"; exit 1 ;;
+esac

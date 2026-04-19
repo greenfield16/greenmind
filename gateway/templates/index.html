@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🌿 Greenmind</title>
+<link rel="manifest" href="/static/manifest.json">
+<style>
+  :root {
+    --bg: #0d0d1a; --card: #1a1a2e; --panel: #16213e;
+    --accent: #4ade80; --danger: #e94560; --warn: #f59e0b;
+    --text: #e2e8f0; --muted: #64748b; --border: #2d3748;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', sans-serif; min-height: 100vh; }
+
+  /* Header */
+  header { background: var(--card); border-bottom: 1px solid var(--border); padding: 12px 20px;
+    display: flex; align-items: center; gap: 12px; }
+  header h1 { font-size: 1.2rem; font-weight: 700; }
+  .version-badge { background: var(--panel); color: var(--accent); padding: 2px 8px;
+    border-radius: 12px; font-size: 0.75rem; }
+  .health-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--muted);
+    margin-left: auto; transition: background 0.3s; }
+  .health-dot.online { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
+
+  /* Tabs */
+  .tabs { display: flex; background: var(--card); border-bottom: 1px solid var(--border); padding: 0 20px; }
+  .tab { padding: 12px 16px; cursor: pointer; font-size: 0.9rem; color: var(--muted);
+    border-bottom: 2px solid transparent; transition: all 0.2s; }
+  .tab:hover { color: var(--text); }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  /* Content */
+  .content { padding: 20px; }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  /* Camera grid */
+  .cam-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+  .cam-card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  .cam-card img { width: 100%; aspect-ratio: 16/9; object-fit: cover; background: #111; display: block; }
+  .cam-info { padding: 10px 12px; }
+  .cam-name { font-weight: 600; font-size: 0.95rem; }
+  .cam-meta { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+  .status-badge { padding: 2px 8px; border-radius: 10px; font-size: 0.75rem; font-weight: 600; }
+  .status-online { background: #14532d; color: var(--accent); }
+  .status-offline { background: #450a0a; color: var(--danger); }
+  .cam-ts { color: var(--muted); font-size: 0.75rem; margin-left: auto; }
+  .cam-actions { padding: 8px 12px; border-top: 1px solid var(--border); }
+  .btn { background: var(--panel); border: 1px solid var(--border); color: var(--text);
+    padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.8rem; transition: all 0.2s; }
+  .btn:hover { background: var(--accent); color: #000; border-color: var(--accent); }
+
+  /* Events table */
+  .events-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+  .events-table th { background: var(--panel); padding: 10px 12px; text-align: left;
+    color: var(--muted); font-weight: 600; border-bottom: 1px solid var(--border); }
+  .events-table td { padding: 10px 12px; border-bottom: 1px solid var(--border); }
+  .events-table tr:hover td { background: var(--panel); }
+  .event-type { padding: 2px 8px; border-radius: 10px; font-size: 0.75rem; font-weight: 600; }
+  .type-motion { background: #1e3a5f; color: #60a5fa; }
+  .type-checkin { background: #14532d; color: #4ade80; }
+  .type-alarm { background: #450a0a; color: #f87171; }
+
+  /* Alert toast */
+  #alert-toast { position: fixed; bottom: 20px; right: 20px; background: var(--danger);
+    color: white; padding: 12px 16px; border-radius: 8px; font-size: 0.9rem;
+    display: none; max-width: 320px; z-index: 1000; box-shadow: 0 4px 12px rgba(0,0,0,0.4); }
+
+  /* Empty state */
+  .empty { text-align: center; color: var(--muted); padding: 40px; }
+
+  /* Devices */
+  .devices-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+  .devices-table th { background: var(--panel); padding: 10px 12px; text-align: left; color: var(--muted); border-bottom: 1px solid var(--border); }
+  .devices-table td { padding: 10px 12px; border-bottom: 1px solid var(--border); }
+</style>
+</head>
+<body>
+
+<header>
+  <span style="font-size:1.4rem">🌿</span>
+  <h1>Greenmind</h1>
+  <span class="version-badge" id="version-badge">v3.0</span>
+  <div class="health-dot" id="health-dot" title="Đang kiểm tra..."></div>
+</header>
+
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('cameras')">📷 Cameras</div>
+  <div class="tab" onclick="switchTab('events')">📋 Sự kiện</div>
+  <div class="tab" onclick="switchTab('devices')">🔧 Thiết bị</div>
+  <div class="tab" onclick="switchTab('reports')">📊 Báo cáo</div>
+</div>
+
+<div class="content">
+  <!-- Cameras -->
+  <div id="tab-cameras" class="tab-panel active">
+    <div class="cam-grid" id="cam-grid">
+      <div class="empty">⏳ Đang tải danh sách camera...</div>
+    </div>
+  </div>
+
+  <!-- Events -->
+  <div id="tab-events" class="tab-panel">
+    <table class="events-table">
+      <thead><tr>
+        <th>Thời gian</th><th>Thiết bị</th><th>Loại</th><th>Phân tích AI</th>
+      </tr></thead>
+      <tbody id="events-body">
+        <tr><td colspan="4" class="empty">Đang tải...</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Devices -->
+  <div id="tab-devices" class="tab-panel">
+    <table class="devices-table">
+      <thead><tr>
+        <th>Tên</th><th>Loại</th><th>Trạng thái</th><th>Lần cuối</th>
+      </tr></thead>
+      <tbody id="devices-body">
+        <tr><td colspan="4" class="empty">Đang tải...</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Reports -->
+  <div id="tab-reports" class="tab-panel">
+    <div id="report-content" class="empty">📊 Đang tải báo cáo...</div>
+  </div>
+</div>
+
+<div id="alert-toast"></div>
+
+<script>
+const API = '';
+let wsRetry = 0;
+
+// Tab switching
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', ['cameras','events','devices','reports'][i] === name));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === `tab-${name}`));
+  if (name === 'events') loadEvents();
+  if (name === 'devices') loadDevices();
+  if (name === 'reports') loadReport();
+}
+
+// Health check
+async function checkHealth() {
+  try {
+    const r = await fetch('/api/health');
+    const d = await r.json();
+    document.getElementById('version-badge').textContent = `v${d.version}`;
+    document.getElementById('health-dot').className = 'health-dot online';
+    document.title = `🌿 Greenmind v${d.version}`;
+  } catch {
+    document.getElementById('health-dot').className = 'health-dot';
+  }
+}
+
+// Load cameras
+async function loadCameras() {
+  try {
+    const devs = await (await fetch('/api/devices')).json();
+    const cameras = devs.filter(d => d.type === 'camera' || !d.type);
+    const grid = document.getElementById('cam-grid');
+    if (!cameras.length) {
+      grid.innerHTML = '<div class="empty">📷 Chưa có camera nào kết nối</div>';
+      return;
+    }
+    grid.innerHTML = cameras.map(cam => `
+      <div class="cam-card" id="cam-${cam.id}">
+        <img src="/api/snapshot/${cam.id}" alt="${cam.name}" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 640 360%22><rect fill=%22%23111%22 width=%22640%22 height=%22360%22/><text fill=%22%23444%22 x=%22320%22 y=%22190%22 text-anchor=%22middle%22 font-size=%2240%22>📷</text></svg>'" />
+        <div class="cam-info">
+          <div class="cam-name">${cam.name}</div>
+          <div class="cam-meta">
+            <span class="status-badge ${cam.status === 'online' ? 'status-online' : 'status-offline'}">${cam.status === 'online' ? '● Online' : '○ Offline'}</span>
+            <span class="cam-ts" id="ts-${cam.id}">${cam.last_seen ? new Date(cam.last_seen*1000).toLocaleTimeString('vi-VN') : '—'}</span>
+          </div>
+        </div>
+        <div class="cam-actions">
+          <button class="btn" onclick="refreshSnap('${cam.id}')">📷 Làm mới</button>
+        </div>
+      </div>
+    `).join('');
+  } catch(e) {
+    document.getElementById('cam-grid').innerHTML = '<div class="empty">❌ Lỗi tải danh sách camera</div>';
+  }
+}
+
+function refreshSnap(id) {
+  const img = document.querySelector(`#cam-${id} img`);
+  if (img) img.src = `/api/snapshot/${id}?t=${Date.now()}`;
+}
+
+// Load events
+async function loadEvents() {
+  try {
+    const events = await (await fetch('/api/events?limit=50')).json();
+    const tbody = document.getElementById('events-body');
+    if (!events.length) { tbody.innerHTML = '<tr><td colspan="4" class="empty">Chưa có sự kiện</td></tr>'; return; }
+    tbody.innerHTML = events.map(e => {
+      const ts = e.ts ? new Date(e.ts*1000).toLocaleString('vi-VN') : '—';
+      const typeClass = {'motion':'type-motion','checkin':'type-checkin','alarm':'type-alarm'}[e.type] || '';
+      const ai = (e.ai_analysis || '').substring(0, 80);
+      return `<tr>
+        <td>${ts}</td>
+        <td>${e.device_name || e.device_id}</td>
+        <td><span class="event-type ${typeClass}">${e.type}</span></td>
+        <td>${ai}</td>
+      </tr>`;
+    }).join('');
+  } catch { document.getElementById('events-body').innerHTML = '<tr><td colspan="4" class="empty">❌ Lỗi</td></tr>'; }
+}
+
+// Load devices
+async function loadDevices() {
+  try {
+    const devs = await (await fetch('/api/devices')).json();
+    const tbody = document.getElementById('devices-body');
+    if (!devs.length) { tbody.innerHTML = '<tr><td colspan="4" class="empty">Chưa có thiết bị</td></tr>'; return; }
+    const typeIcon = {camera:'📷',access:'⏰',lock:'🔐',sensor:'🌡️',relay:'💡',barrier:'🚗'};
+    tbody.innerHTML = devs.map(d => `<tr>
+      <td>${d.name}</td>
+      <td>${typeIcon[d.type]||'📦'} ${d.type}</td>
+      <td><span class="status-badge ${d.status==='online'?'status-online':'status-offline'}">${d.status}</span></td>
+      <td>${d.last_seen ? new Date(d.last_seen*1000).toLocaleString('vi-VN') : '—'}</td>
+    </tr>`).join('');
+  } catch { document.getElementById('devices-body').innerHTML = '<tr><td colspan="4" class="empty">❌ Lỗi</td></tr>'; }
+}
+
+// Load report
+async function loadReport() {
+  try {
+    const today = new Date().toISOString().slice(0,10);
+    const att = await (await fetch(`/api/reports/attendance?date=${today}`)).json();
+    const events = await (await fetch('/api/events?limit=200')).json();
+    const todayEvents = events.filter(e => {
+      const d = new Date(e.ts*1000).toISOString().slice(0,10);
+      return d === today;
+    });
+    const motion = todayEvents.filter(e => e.type === 'motion').length;
+    document.getElementById('report-content').innerHTML = `
+      <div style="max-width:500px;margin:0 auto;text-align:left">
+        <h3 style="margin-bottom:16px">📊 Báo cáo hôm nay — ${new Date().toLocaleDateString('vi-VN')}</h3>
+        <div style="background:var(--card);padding:16px;border-radius:8px;margin-bottom:12px">
+          <div>🚶 Phát hiện chuyển động: <strong>${motion}</strong></div>
+          <div>⏰ Lượt chấm công: <strong>${att.length}</strong></div>
+          <div>📋 Tổng sự kiện: <strong>${todayEvents.length}</strong></div>
+        </div>
+      </div>`;
+  } catch { document.getElementById('report-content').innerHTML = '<div class="empty">❌ Lỗi tải báo cáo</div>'; }
+}
+
+// WebSocket realtime
+function connectWS() {
+  const ws = new WebSocket(`ws://${location.host}/ws/events`);
+  ws.onmessage = e => {
+    const data = JSON.parse(e.data);
+    if (data.type === 'motion') {
+      showToast(`🚨 Motion: ${data.device_id}\n${(data.analysis||'').substring(0,80)}`);
+      refreshSnap(data.device_id);
+    }
+  };
+  ws.onclose = () => { wsRetry++; setTimeout(connectWS, Math.min(wsRetry*2000, 30000)); };
+  ws.onerror = () => ws.close();
+}
+
+function showToast(msg) {
+  const t = document.getElementById('alert-toast');
+  t.textContent = msg; t.style.display = 'block';
+  setTimeout(() => t.style.display = 'none', 5000);
+}
+
+// Init
+checkHealth();
+loadCameras();
+connectWS();
+setInterval(checkHealth, 30000);
+setInterval(loadCameras, 30000);
+</script>
+</body>
+</html>

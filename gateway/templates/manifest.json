@@ -1,0 +1,13 @@
+{
+  "name": "Greenmind",
+  "short_name": "Greenmind",
+  "description": "Smart Building AI Platform",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0d0d1a",
+  "theme_color": "#4ade80",
+  "icons": [
+    {"src": "/static/icon-192.png", "sizes": "192x192", "type": "image/png"},
+    {"src": "/static/icon-512.png", "sizes": "512x512", "type": "image/png"}
+  ]
+}
