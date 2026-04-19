@@ -4,111 +4,41 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>🌿 Greenmind Dashboard</title>
-<style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{background:#0f1117;color:#e0e0e0;font-family:'Segoe UI',sans-serif;min-height:100vh}
-.header{background:#1a1d27;padding:14px 24px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #2a2d3a;position:sticky;top:0;z-index:50}
-.logo-text{font-size:20px;font-weight:700;color:#4caf7d;letter-spacing:1px}
-.logo small{font-size:11px;color:#555;margin-left:4px}
-.header-right{display:flex;align-items:center;gap:20px;font-size:13px;color:#888}
-.dot{width:8px;height:8px;border-radius:50%;background:#4caf7d;display:inline-block;margin-right:5px;animation:pulse 2s infinite}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
-.statsbar{background:#1a1d27;padding:10px 24px;display:flex;gap:32px;border-bottom:1px solid #2a2d3a;font-size:13px;flex-wrap:wrap}
-.stat .num{font-size:22px;font-weight:700;color:#4caf7d}
-.stat.warn .num{color:#f5a623}.stat.err .num{color:#e74c3c}
-.stat label{font-size:11px;color:#666;display:block}
-.stat-sep{margin-left:auto;font-size:12px;color:#444;align-self:center}
-.tabs{background:#13151f;border-bottom:1px solid #2a2d3a;display:flex;padding:0 24px}
-.tab{padding:11px 20px;font-size:13px;color:#666;cursor:pointer;border-bottom:2px solid transparent;transition:.15s}
-.tab:hover{color:#ccc}.tab.active{color:#4caf7d;border-bottom-color:#4caf7d}
-.toolbar{padding:12px 24px;display:flex;align-items:center;gap:10px;background:#13151f;flex-wrap:wrap}
-.btn{padding:7px 16px;border-radius:6px;border:none;cursor:pointer;font-size:13px;font-weight:500;transition:.15s}
-.btn-primary{background:#4caf7d;color:#fff}.btn-primary:hover{background:#3d9e6e}
-.btn-outline{background:transparent;color:#aaa;border:1px solid #333}.btn-outline:hover{border-color:#4caf7d;color:#4caf7d}
-.btn-active{background:#1e2535;color:#4caf7d;border:1px solid #4caf7d}
-.search{margin-left:auto;background:#1e2535;border:1px solid #2a2d3a;border-radius:6px;padding:7px 14px;color:#ccc;font-size:13px;outline:none;width:220px}
-.search::placeholder{color:#555}
-.view{display:none;padding:20px 24px}.view.active{display:block}
-.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
-@media(max-width:1300px){.grid{grid-template-columns:repeat(3,1fr)}}
-@media(max-width:960px){.grid{grid-template-columns:repeat(2,1fr)}}
-@media(max-width:600px){.grid{grid-template-columns:1fr}}
-.cam-card{background:#1a1d27;border-radius:10px;overflow:hidden;border:1px solid #2a2d3a;cursor:pointer;transition:.2s}
-.cam-card:hover{border-color:#4caf7d;transform:translateY(-2px);box-shadow:0 4px 20px rgba(76,175,125,.15)}
-.cam-card.offline{opacity:.5}
-.cam-thumb{width:100%;aspect-ratio:16/9;background:#0d0f17;position:relative;overflow:hidden}
-.cam-thumb img{width:100%;height:100%;object-fit:cover;display:block}
-.no-signal{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#444;font-size:12px;gap:6px}
-.no-signal .icon{font-size:32px}
-.badge-status{position:absolute;top:8px;left:8px;padding:3px 8px;border-radius:4px;font-size:10px;font-weight:700}
-.badge-online{background:rgba(76,175,125,.85);color:#fff}
-.badge-offline{background:rgba(80,80,80,.85);color:#ccc}
-.cam-ts{position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,.55);color:#aaa;font-size:10px;padding:3px 8px;font-family:monospace}
-.cam-info{padding:10px 12px;display:flex;align-items:center;justify-content:space-between}
-.cam-name{font-size:13px;font-weight:600;color:#ddd}
-.cam-loc{font-size:11px;color:#666;margin-top:2px}
-.cam-actions{display:flex;gap:6px}
-.icon-btn{background:#252836;border:none;border-radius:5px;color:#888;padding:5px 8px;cursor:pointer;font-size:13px;transition:.15s}
-.icon-btn:hover{background:#2e3347;color:#4caf7d}
-.no-cam{text-align:center;padding:80px 24px;color:#555;grid-column:1/-1}
-.no-cam .big{font-size:48px;margin-bottom:12px}
-.fp-wrap{display:flex;gap:20px;flex-wrap:wrap}
-.fp-canvas-wrap{position:relative;flex:1;min-width:300px;background:#1a1d27;border:1px solid #2a2d3a;border-radius:10px;overflow:hidden;min-height:300px}
-.fp-sidebar{width:220px;background:#1a1d27;border:1px solid #2a2d3a;border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:6px;max-height:70vh;overflow-y:auto}
-.fp-sidebar h4{font-size:13px;color:#4caf7d;margin-bottom:4px}
-.fp-cam-item{background:#252836;border-radius:6px;padding:8px 10px;font-size:11px;cursor:pointer;border:1px solid #333;display:flex;align-items:center;gap:8px;transition:.15s;word-break:break-all}
-.fp-cam-item:hover{border-color:#4caf7d}.fp-cam-item.placed{opacity:.4;cursor:default}
-.fp-cam-item.sel{border-color:#4caf7d;background:#1e2535;color:#4caf7d}
-.fp-no-img{padding:60px 20px;text-align:center;color:#555}
-.fp-no-img .big{font-size:48px;margin-bottom:12px}
-.fp-instr{font-size:11px;color:#555;line-height:1.7;margin-top:8px;border-top:1px solid #252836;padding-top:8px}
-.cam-pin{position:absolute;transform:translate(-50%,-50%);cursor:pointer;z-index:10;text-align:center}
-.cam-pin .pi{font-size:24px;transition:.2s;display:block;filter:drop-shadow(0 2px 6px rgba(0,0,0,.8))}
-.cam-pin:hover .pi{transform:scale(1.3)}
-.cam-pin .pl{white-space:nowrap;font-size:10px;background:rgba(0,0,0,.75);color:#ddd;padding:1px 5px;border-radius:3px;margin-top:2px;display:inline-block}
-.cam-pin.online .pi{filter:drop-shadow(0 0 6px #4caf7d)}
-.cam-pin.offline .pi{filter:grayscale(1) drop-shadow(0 0 4px #e74c3c)}
-.edit-bar{background:#1e2535;border:1px solid #4caf7d44;border-radius:8px;padding:10px 14px;font-size:12px;color:#4caf7d;display:none;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap}
-.edit-bar.on{display:flex}
-.popup{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:200;display:none;align-items:center;justify-content:center}
-.popup.open{display:flex}
-.popup-box{background:#1a1d27;border-radius:12px;border:1px solid #2a2d3a;padding:20px;width:420px;max-width:95vw}
-.popup-box h3{font-size:15px;color:#4caf7d;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center}
-.popup-close{background:none;border:none;color:#666;font-size:20px;cursor:pointer}.popup-close:hover{color:#fff}
-.popup-img{width:100%;border-radius:8px;margin-bottom:12px;aspect-ratio:16/9;object-fit:cover;background:#0d0f17}
-.popup-row{display:flex;justify-content:space-between;font-size:13px;padding:7px 0;border-bottom:1px solid #252836;color:#999}
-.popup-row span:last-child{color:#ddd}
-.popup-acts{display:flex;gap:8px;margin-top:12px}
-.pbtn{flex:1;padding:9px;border-radius:6px;border:none;cursor:pointer;font-size:13px;font-weight:500}
-.pbtn-p{background:#4caf7d;color:#fff}.pbtn-p:hover{background:#3d9e6e}
-.pbtn-o{background:#252836;color:#aaa;border:1px solid #333}.pbtn-o:hover{border-color:#4caf7d;color:#4caf7d}
-</style>
+<link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
 
+<!-- Header -->
 <div class="header">
   <div class="logo">
     <span class="logo-text">🌿 GREENMIND</span>
-    <small>AI CCTV Dashboard</small>
+    <small>AI CCTV Dashboard v2.0</small>
   </div>
   <div class="header-right">
-    <span><span class="dot"></span><span id="sys-status">Đang tải...</span></span>
+    <span><span class="dot" id="sys-dot"></span><span id="sys-status">Đang tải...</span></span>
+    <span id="frigate-status"><span class="dot red" id="frigate-dot"></span>Frigate: —</span>
+    <span>WS: <span id="ws-status" style="color:#e74c3c">—</span></span>
     <span>🕐 <span id="clock">--:--:--</span></span>
   </div>
 </div>
 
+<!-- Stats -->
 <div class="statsbar">
   <div class="stat"><div class="num" id="s-total">—</div><label>TỔNG CAM</label></div>
   <div class="stat"><div class="num" id="s-on">—</div><label>ONLINE</label></div>
   <div class="stat warn"><div class="num" id="s-off">—</div><label>OFFLINE</label></div>
+  <div class="stat err"><div class="num" id="s-alerts">0</div><label>CẢNH BÁO HÔM NAY</label></div>
   <div class="stat-sep">Cập nhật: <span id="last-upd" style="color:#4caf7d">—</span></div>
 </div>
 
+<!-- Tabs -->
 <div class="tabs">
   <div class="tab active" onclick="switchTab('grid')">⊞ Grid</div>
   <div class="tab" onclick="switchTab('floor')">🗺 Sơ đồ toà nhà</div>
+  <div class="tab" onclick="switchTab('alerts')">🔔 Cảnh báo<span class="tab-badge" id="alert-badge">0</span></div>
 </div>
 
+<!-- Toolbars -->
 <div class="toolbar" id="tb-grid">
   <button class="btn btn-primary" onclick="fetchCameras()">🔄 Refresh</button>
   <button class="btn btn-outline" onclick="toggleOffline()">⚠️ Offline</button>
@@ -118,11 +48,22 @@ body{background:#0f1117;color:#e0e0e0;font-family:'Segoe UI',sans-serif;min-heig
   <button class="btn btn-outline" id="btn-edit" onclick="toggleEdit()">✏️ Chỉnh vị trí</button>
   <button class="btn btn-outline" id="btn-save" style="display:none" onclick="saveLayout()">💾 Lưu layout</button>
   <button class="btn btn-outline" onclick="clearLayout()">🗑 Xoá layout</button>
-  <label class="btn btn-outline" style="cursor:pointer">📁 Upload mặt bằng<input type="file" accept="image/*" style="display:none" onchange="uploadFp(this)"></label>
+  <label class="btn btn-outline" style="cursor:pointer">📁 Upload mặt bằng
+    <input type="file" accept="image/*" style="display:none" onchange="uploadFp(this)">
+  </label>
+</div>
+<div class="toolbar" id="tb-alerts" style="display:none">
+  <button class="btn btn-primary" onclick="fetchAlerts()">🔄 Refresh</button>
+  <button class="btn btn-danger" onclick="clearAlerts()">🗑 Xoá tất cả</button>
+  <span style="font-size:12px;color:#666;margin-left:8px">Cảnh báo realtime qua WebSocket</span>
 </div>
 
-<div class="view active" id="view-grid"><div class="grid" id="grid"></div></div>
+<!-- View: Grid -->
+<div class="view active" id="view-grid">
+  <div class="grid" id="grid"></div>
+</div>
 
+<!-- View: Floorplan -->
 <div class="view" id="view-floor" style="padding:16px 24px">
   <div class="edit-bar" id="edit-bar">
     ✏️ <b>Edit mode</b> — Chọn cam bên phải → click vị trí trên sơ đồ. Click pin để xoá.
@@ -156,187 +97,423 @@ body{background:#0f1117;color:#e0e0e0;font-family:'Segoe UI',sans-serif;min-heig
   </div>
 </div>
 
+<!-- View: Alerts -->
+<div class="view" id="view-alerts">
+  <div class="alert-list" id="alert-list">
+    <div class="no-alerts"><div class="big">🔔</div><div>Chưa có cảnh báo nào.</div></div>
+  </div>
+</div>
+
+<!-- Popup chi tiết camera -->
 <div class="popup" id="popup" onclick="if(event.target===this)closePopup()">
   <div class="popup-box">
-    <h3><span id="pp-title">Camera</span><button class="popup-close" onclick="closePopup()">✕</button></h3>
+    <h3>
+      <span id="pp-title">Camera</span>
+      <button class="popup-close" onclick="closePopup()">✕</button>
+    </h3>
     <img class="popup-img" id="pp-img" src="" alt="">
     <div id="pp-rows"></div>
     <div class="popup-acts">
       <button class="pbtn pbtn-p" id="pp-cap" onclick="captureNow()">📸 Chụp ngay</button>
       <button class="pbtn pbtn-o" onclick="closePopup()">Đóng</button>
     </div>
+    <div class="popup-alerts">
+      <h4>🔔 Cảnh báo gần đây</h4>
+      <div id="pp-alerts"><span style="color:#555;font-size:12px">Không có cảnh báo.</span></div>
+    </div>
   </div>
 </div>
 
 <script>
-let allCams=[], offlineOnly=false, curTab='grid';
-let editMode=false, selDrag=null;
-let fp={image:null,cameras:{}}, fpImgEl=null, selCam=null;
+// ── State ──────────────────────────────────────────────────────────────────
+let allCams = [], allAlerts = [];
+let offlineOnly = false, curTab = 'grid';
+let editMode = false, selDrag = null;
+let fp = { image: null, cameras: {} }, fpImgEl = null;
+let selCam = null, newAlertCount = 0, frigateOnline = false;
 
-async function fetchCameras(){
-  try{
-    const r=await fetch('/api/cameras'); allCams=await r.json();
-    document.getElementById('s-total').textContent=allCams.length;
-    document.getElementById('s-on').textContent=allCams.filter(c=>c.online).length;
-    document.getElementById('s-off').textContent=allCams.filter(c=>!c.online).length;
-    document.getElementById('last-upd').textContent=new Date().toLocaleTimeString('vi-VN');
-    const on=allCams.filter(c=>c.online).length;
-    document.getElementById('sys-status').textContent=
-      on===allCams.length?'Hoạt động bình thường':on===0?'Mất kết nối':`${on}/${allCams.length} online`;
-    if(curTab==='grid') renderGrid();
-    if(curTab==='floor'){renderFpList();renderPins();}
-  }catch(e){document.getElementById('sys-status').textContent='Không kết nối server';}
+// ── Helpers ────────────────────────────────────────────────────────────────
+function isToday(ts) {
+  const d = new Date(ts * 1000), n = new Date();
+  return d.getDate() === n.getDate() && d.getMonth() === n.getMonth() && d.getFullYear() === n.getFullYear();
 }
 
-function renderGrid(){
-  const q=document.getElementById('q').value.toLowerCase();
-  const cams=allCams.filter(c=>c.name.toLowerCase().includes(q)&&(!offlineOnly||!c.online));
-  const g=document.getElementById('grid');
-  if(!cams.length){g.innerHTML='<div class="no-cam"><div class="big">📷</div><div>Không có camera nào.</div></div>';return;}
-  g.innerHTML=cams.map(c=>{
-    const ts=c.last_snap?new Date(c.last_snap*1000).toLocaleTimeString('vi-VN'):null;
-    return `<div class="cam-card ${c.online?'':'offline'}" onclick="openPopup('${c.name}')">
+function fmtTime(ts) {
+  return new Date(ts * 1000).toLocaleTimeString('vi-VN');
+}
+
+function fmtDateTime(ts) {
+  return new Date(ts * 1000).toLocaleString('vi-VN');
+}
+
+// ── WebSocket ──────────────────────────────────────────────────────────────
+let ws, wsReconnectTimer;
+
+function connectWS() {
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  ws = new WebSocket(`${proto}://${location.host}/ws/alerts`);
+
+  ws.onopen = () => {
+    document.getElementById('ws-status').textContent = '🟢 Live';
+    document.getElementById('ws-status').style.color = '#4caf7d';
+    clearTimeout(wsReconnectTimer);
+  };
+
+  ws.onclose = () => {
+    document.getElementById('ws-status').textContent = '🔴 Offline';
+    document.getElementById('ws-status').style.color = '#e74c3c';
+    wsReconnectTimer = setTimeout(connectWS, 5000);
+  };
+
+  ws.onerror = () => ws.close();
+
+  ws.onmessage = e => {
+    try { onNewAlert(JSON.parse(e.data)); } catch (_) {}
+  };
+}
+
+function onNewAlert(alert) {
+  // Tránh duplicate
+  if (allAlerts.find(a => a.id && a.id === alert.id)) return;
+
+  allAlerts.unshift(alert);
+  if (allAlerts.length > 200) allAlerts.pop();
+
+  // Flash card
+  const card = document.getElementById('card-' + alert.cam);
+  if (card) {
+    card.classList.add('alert-flash');
+    setTimeout(() => card.classList.remove('alert-flash'), 3000);
+  }
+
+  // Update badge count trên card
+  updateCardAlertBadge(alert.cam);
+
+  // Stats bar
+  document.getElementById('s-alerts').textContent =
+    allAlerts.filter(a => isToday(a.ts)).length;
+
+  // Tab badge
+  if (curTab !== 'alerts') {
+    newAlertCount++;
+    const b = document.getElementById('alert-badge');
+    b.textContent = newAlertCount > 99 ? '99+' : newAlertCount;
+    b.classList.add('on');
+  }
+
+  // Re-render nếu đang ở tab alerts
+  if (curTab === 'alerts') renderAlerts();
+}
+
+function updateCardAlertBadge(camName) {
+  const badge = document.getElementById('abadge-' + camName);
+  if (!badge) return;
+  const count = allAlerts.filter(a => a.cam === camName && isToday(a.ts)).length;
+  badge.textContent = count;
+  badge.classList.toggle('on', count > 0);
+}
+
+// ── Cameras API ────────────────────────────────────────────────────────────
+async function fetchCameras() {
+  try {
+    const r = await fetch('/api/cameras');
+    allCams = await r.json();
+    document.getElementById('s-total').textContent = allCams.length;
+    document.getElementById('s-on').textContent  = allCams.filter(c => c.online).length;
+    document.getElementById('s-off').textContent = allCams.filter(c => !c.online).length;
+    document.getElementById('last-upd').textContent = new Date().toLocaleTimeString('vi-VN');
+    const on = allCams.filter(c => c.online).length;
+    document.getElementById('sys-status').textContent =
+      on === allCams.length ? 'Hoạt động bình thường' :
+      on === 0 ? 'Mất kết nối' : `${on}/${allCams.length} online`;
+    if (curTab === 'grid')  renderGrid();
+    if (curTab === 'floor') { renderFpList(); renderPins(); }
+  } catch (e) {
+    document.getElementById('sys-status').textContent = 'Không kết nối server';
+  }
+}
+
+async function fetchFrigateStatus() {
+  try {
+    const d = await (await fetch('/api/frigate/status')).json();
+    frigateOnline = d.online;
+    document.getElementById('frigate-status').innerHTML = d.online
+      ? `<span class="dot" id="frigate-dot"></span>Frigate: <span style="color:#4caf7d">Online</span>`
+      : `<span class="dot red" id="frigate-dot"></span>Frigate: <span style="color:#e74c3c">Offline</span>`;
+  } catch (_) {}
+}
+
+// ── Grid Render ────────────────────────────────────────────────────────────
+function renderGrid() {
+  const q = document.getElementById('q').value.toLowerCase();
+  const cams = allCams.filter(c =>
+    c.name.toLowerCase().includes(q) && (!offlineOnly || !c.online)
+  );
+  const g = document.getElementById('grid');
+  if (!cams.length) {
+    g.innerHTML = '<div class="no-cam"><div class="big">📷</div><div>Không có camera nào.</div></div>';
+    return;
+  }
+  g.innerHTML = cams.map(c => {
+    const ts = c.last_snap ? fmtTime(c.last_snap) : null;
+    const alertCount = allAlerts.filter(a => a.cam === c.name && isToday(a.ts)).length;
+    let thumbHtml;
+    if (frigateOnline && c.webrtc_url) {
+      thumbHtml = `<iframe src="${c.webrtc_url}" allowfullscreen allow="autoplay" loading="lazy"></iframe>`;
+    } else if (c.online) {
+      thumbHtml = `<img id="img-${c.name}" src="/api/snapshot/${c.name}?t=${Date.now()}" alt="" loading="lazy">`;
+    } else {
+      thumbHtml = `<div class="no-signal"><div class="icon">📷</div><div>Mất tín hiệu</div></div>`;
+    }
+    return `
+    <div class="cam-card ${c.online ? '' : 'offline'}" id="card-${c.name}" onclick="openPopup('${c.name}')">
       <div class="cam-thumb">
-        ${c.online?`<img id="img-${c.name}" src="/api/snapshot/${c.name}?t=${Date.now()}" alt="" loading="lazy">`
-          :`<div class="no-signal"><div class="icon">📷</div><div>Mất tín hiệu</div></div>`}
-        <div class="badge-status ${c.online?'badge-online':'badge-offline'}">${c.online?'● LIVE':'○ OFFLINE'}</div>
-        ${ts?`<div class="cam-ts">${ts} — ${c.name}</div>`:''}
+        ${thumbHtml}
+        <div class="badge-status ${c.online ? 'badge-online' : 'badge-offline'}">${c.online ? '● LIVE' : '○ OFFLINE'}</div>
+        <div class="badge-alert-count ${alertCount > 0 ? 'on' : ''}" id="abadge-${c.name}">${alertCount || ''}</div>
+        ${ts ? `<div class="cam-ts">${ts} — ${c.name}</div>` : ''}
       </div>
       <div class="cam-info">
-        <div><div class="cam-name">${c.name}</div><div class="cam-loc">${c.online?'🟢 Online':'🔴 Offline'}</div></div>
-        <div class="cam-actions"><button class="icon-btn" onclick="event.stopPropagation();qcap('${c.name}')">📸</button></div>
-      </div></div>`;
+        <div>
+          <div class="cam-name">${c.name}</div>
+          <div class="cam-loc">${c.online ? '🟢 Online' : '🔴 Offline'}${alertCount > 0 ? ` · 🔔 ${alertCount}` : ''}</div>
+        </div>
+        <div class="cam-actions">
+          <button class="icon-btn" onclick="event.stopPropagation();qcap('${c.name}')">📸</button>
+        </div>
+      </div>
+    </div>`;
   }).join('');
 }
-async function qcap(n){await fetch('/api/capture/'+n);const i=document.getElementById('img-'+n);if(i)i.src=`/api/snapshot/${n}?t=${Date.now()}`;}
-function toggleOffline(){offlineOnly=!offlineOnly;renderGrid();}
 
-function openPopup(n){
-  selCam=n; const c=allCams.find(x=>x.name===n); if(!c)return;
-  document.getElementById('pp-title').textContent=c.name;
-  document.getElementById('pp-img').src=`/api/snapshot/${n}?t=${Date.now()}`;
-  const ts=c.last_snap?new Date(c.last_snap*1000).toLocaleString('vi-VN'):'—';
-  document.getElementById('pp-rows').innerHTML=`
-    <div class="popup-row"><span>Trạng thái</span><span style="color:${c.online?'#4caf7d':'#e74c3c'}">${c.online?'🟢 Online':'🔴 Offline'}</span></div>
-    <div class="popup-row"><span>RTSP</span><span style="font-size:11px">${c.rtsp.replace(/:[^:@]+@/,':***@')}</span></div>
-    <div class="popup-row"><span>Ảnh cuối</span><span>${ts}</span></div>`;
+async function qcap(n) {
+  await fetch('/api/capture/' + n);
+  const i = document.getElementById('img-' + n);
+  if (i) i.src = `/api/snapshot/${n}?t=${Date.now()}`;
+}
+
+function toggleOffline() { offlineOnly = !offlineOnly; renderGrid(); }
+
+// ── Popup ──────────────────────────────────────────────────────────────────
+function openPopup(n) {
+  selCam = n;
+  const c = allCams.find(x => x.name === n);
+  if (!c) return;
+  document.getElementById('pp-title').textContent = c.name;
+  document.getElementById('pp-img').src = `/api/snapshot/${n}?t=${Date.now()}`;
+  const ts = c.last_snap ? fmtDateTime(c.last_snap) : '—';
+  document.getElementById('pp-rows').innerHTML = `
+    <div class="popup-row"><span>Trạng thái</span><span style="color:${c.online ? '#4caf7d' : '#e74c3c'}">${c.online ? '🟢 Online' : '🔴 Offline'}</span></div>
+    <div class="popup-row"><span>RTSP</span><span style="font-size:11px">${c.rtsp.replace(/:[^:@]+@/, ':***@')}</span></div>
+    <div class="popup-row"><span>Ảnh cuối</span><span>${ts}</span></div>
+    <div class="popup-row"><span>Cảnh báo hôm nay</span><span style="color:#e74c3c">${allAlerts.filter(a => a.cam === n && isToday(a.ts)).length}</span></div>`;
+
+  // 5 alerts gần nhất của cam này
+  const camAlerts = allAlerts.filter(a => a.cam === n).slice(0, 5);
+  document.getElementById('pp-alerts').innerHTML = camAlerts.length
+    ? camAlerts.map(a => `
+      <div class="mini-alert">
+        <span class="mini-alert-label">${a.label_vn || a.label}</span>
+        <span class="mini-alert-desc">${a.description || '—'}</span>
+        <span class="mini-alert-ts">${a.ts_str || ''}</span>
+      </div>`).join('')
+    : '<span style="color:#555;font-size:12px">Không có cảnh báo.</span>';
+
   document.getElementById('popup').classList.add('open');
 }
-async function captureNow(){
-  if(!selCam)return;
-  const b=document.getElementById('pp-cap'); b.textContent='⏳...'; b.disabled=true;
-  await fetch('/api/capture/'+selCam);
-  document.getElementById('pp-img').src=`/api/snapshot/${selCam}?t=${Date.now()}`;
-  b.textContent='📸 Chụp ngay'; b.disabled=false; fetchCameras();
-}
-function closePopup(){document.getElementById('popup').classList.remove('open');selCam=null;}
 
-// ── Floorplan ─────────────────────────────────────────────────────────────────
-async function fetchFp(){
-  try{
-    const r=await fetch('/api/floorplan'); fp=await r.json();
-    if(fp.has_image) loadFpImg();
-    renderFpList(); renderPins();
-  }catch(e){}
+async function captureNow() {
+  if (!selCam) return;
+  const b = document.getElementById('pp-cap');
+  b.textContent = '⏳...'; b.disabled = true;
+  await fetch('/api/capture/' + selCam);
+  document.getElementById('pp-img').src = `/api/snapshot/${selCam}?t=${Date.now()}`;
+  b.textContent = '📸 Chụp ngay'; b.disabled = false;
+  fetchCameras();
 }
 
-function loadFpImg(){
-  document.getElementById('fp-noimgmsg').style.display='none';
-  if(!fpImgEl){
-    fpImgEl=document.createElement('img');
-    fpImgEl.style.cssText='width:100%;display:block;border-radius:10px';
-    fpImgEl.onclick=onFpClick;
-    const wrap=document.getElementById('fp-wrap');
-    wrap.insertBefore(fpImgEl,document.getElementById('fp-pins'));
+function closePopup() {
+  document.getElementById('popup').classList.remove('open');
+  selCam = null;
+}
+
+// ── Alerts tab ─────────────────────────────────────────────────────────────
+async function fetchAlerts() {
+  try {
+    const r = await fetch('/api/alerts?limit=100');
+    const data = await r.json();
+    // Merge với allAlerts (ưu tiên WS realtime)
+    data.forEach(a => {
+      if (!allAlerts.find(x => x.id && x.id === a.id)) allAlerts.push(a);
+    });
+    allAlerts.sort((a, b) => b.ts - a.ts);
+    renderAlerts();
+    document.getElementById('s-alerts').textContent =
+      allAlerts.filter(a => isToday(a.ts)).length;
+  } catch (e) {}
+}
+
+function renderAlerts() {
+  const el = document.getElementById('alert-list');
+  if (!allAlerts.length) {
+    el.innerHTML = '<div class="no-alerts"><div class="big">🔔</div><div>Chưa có cảnh báo nào.</div></div>';
+    return;
   }
-  fpImgEl.src='/api/floorplan/image?t='+Date.now();
+  el.innerHTML = allAlerts.map(a => `
+    <div class="alert-item">
+      <div class="alert-thumb" onclick="openPopup('${a.cam}')">
+        <img src="${a.snapshot_url || `/api/snapshot/${a.cam}`}" alt="" loading="lazy"
+             onerror="this.style.display='none'">
+      </div>
+      <div class="alert-body">
+        <div class="alert-header">
+          <span class="alert-cam">📷 ${a.cam}</span>
+          <span class="alert-label">${a.label_vn || a.label}</span>
+          <span class="alert-score">${a.score ? Math.round(a.score * 100) + '%' : ''}</span>
+        </div>
+        <div class="alert-ts">${a.ts_str || fmtDateTime(a.ts)}</div>
+        <div class="alert-desc">${a.description || '—'}</div>
+      </div>
+    </div>`).join('');
 }
 
-async function uploadFp(input){
-  const file=input.files[0]; if(!file)return;
-  const fd=new FormData(); fd.append('file',file);
-  await fetch('/api/floorplan/image',{method:'POST',body:fd});
-  fp.has_image=true; loadFpImg();
+async function clearAlerts() {
+  if (!confirm('Xoá toàn bộ cảnh báo?')) return;
+  await fetch('/api/alerts', { method: 'DELETE' });
+  allAlerts = [];
+  newAlertCount = 0;
+  document.getElementById('alert-badge').classList.remove('on');
+  document.getElementById('s-alerts').textContent = '0';
+  renderAlerts();
 }
 
-function renderFpList(){
-  const placed=Object.keys(fp.cameras||{});
-  document.getElementById('fp-list').innerHTML=allCams.map(c=>{
-    const isp=placed.includes(c.name);
-    const issel=selDrag===c.name;
-    return `<div class="fp-cam-item ${isp?'placed':''} ${issel?'sel':''}"
-      onclick="${editMode&&!isp?`selDragFn('${c.name}')`:isp?'':''}"
-      title="${isp?'Đã đặt':'Click để chọn'}">
-      <span>${c.online?'🟢':'🔴'}</span>
+// ── Floorplan ──────────────────────────────────────────────────────────────
+async function fetchFp() {
+  try {
+    fp = await (await fetch('/api/floorplan')).json();
+    if (fp.has_image) loadFpImg();
+    renderFpList();
+    renderPins();
+  } catch (_) {}
+}
+
+function loadFpImg() {
+  document.getElementById('fp-noimgmsg').style.display = 'none';
+  if (!fpImgEl) {
+    fpImgEl = document.createElement('img');
+    fpImgEl.style.cssText = 'width:100%;display:block;border-radius:10px';
+    fpImgEl.onclick = onFpClick;
+    const wrap = document.getElementById('fp-wrap');
+    wrap.insertBefore(fpImgEl, document.getElementById('fp-pins'));
+  }
+  fpImgEl.src = '/api/floorplan/image?t=' + Date.now();
+}
+
+async function uploadFp(input) {
+  const file = input.files[0]; if (!file) return;
+  const fd = new FormData(); fd.append('file', file);
+  await fetch('/api/floorplan/image', { method: 'POST', body: fd });
+  fp.has_image = true; loadFpImg();
+}
+
+function renderFpList() {
+  const placed = Object.keys(fp.cameras || {});
+  document.getElementById('fp-list').innerHTML = allCams.map(c => {
+    const isp = placed.includes(c.name);
+    const issel = selDrag === c.name;
+    return `<div class="fp-cam-item ${isp ? 'placed' : ''} ${issel ? 'sel' : ''}"
+      onclick="${editMode && !isp ? `selDragFn('${c.name}')` : ''}"
+      title="${isp ? 'Đã đặt' : 'Click để chọn'}">
+      <span>${c.online ? '🟢' : '🔴'}</span>
       <span>${c.name}</span>
-      ${isp?'<span style="margin-left:auto;color:#4caf7d">✓</span>':''}
+      ${isp ? '<span style="margin-left:auto;color:#4caf7d">✓</span>' : ''}
     </div>`;
-  }).join('')||'<div style="font-size:12px;color:#555">Chưa có camera.</div>';
+  }).join('') || '<div style="font-size:12px;color:#555">Chưa có camera.</div>';
 }
 
-function selDragFn(n){selDrag=selDrag===n?null:n;renderFpList();}
+function selDragFn(n) { selDrag = selDrag === n ? null : n; renderFpList(); }
 
-function onFpClick(e){
-  if(!editMode||!fpImgEl||!selDrag)return;
-  const rect=fpImgEl.getBoundingClientRect();
-  const x=(e.clientX-rect.left)/rect.width;
-  const y=(e.clientY-rect.top)/rect.height;
-  if(!fp.cameras)fp.cameras={};
-  fp.cameras[selDrag]={x,y};
-  selDrag=null; renderFpList(); renderPins();
+function onFpClick(e) {
+  if (!editMode || !fpImgEl || !selDrag) return;
+  const rect = fpImgEl.getBoundingClientRect();
+  const x = (e.clientX - rect.left) / rect.width;
+  const y = (e.clientY - rect.top)  / rect.height;
+  if (!fp.cameras) fp.cameras = {};
+  fp.cameras[selDrag] = { x, y };
+  selDrag = null; renderFpList(); renderPins();
 }
 
-function renderPins(){
-  const pins=document.getElementById('fp-pins');
-  if(!fpImgEl){pins.innerHTML='';return;}
-  pins.innerHTML=Object.entries(fp.cameras||{}).map(([n,pos])=>{
-    const c=allCams.find(x=>x.name===n);
-    const cls=c?(c.online?'online':'offline'):'offline';
+function renderPins() {
+  const pins = document.getElementById('fp-pins');
+  if (!fpImgEl) { pins.innerHTML = ''; return; }
+  pins.innerHTML = Object.entries(fp.cameras || {}).map(([n, pos]) => {
+    const c = allCams.find(x => x.name === n);
+    const cls = c ? (c.online ? 'online' : 'offline') : 'offline';
     return `<div class="cam-pin ${cls}" style="left:${pos.x*100}%;top:${pos.y*100}%" onclick="pinClick(event,'${n}')">
       <span class="pi">📷</span>
-      <span class="pl">${n.replace(/^CAM_/,'')}</span>
+      <span class="pl">${n.replace(/^CAM_/, '')}</span>
     </div>`;
   }).join('');
 }
 
-function pinClick(e,n){
+function pinClick(e, n) {
   e.stopPropagation();
-  if(editMode){delete fp.cameras[n];renderFpList();renderPins();}
+  if (editMode) { delete fp.cameras[n]; renderFpList(); renderPins(); }
   else openPopup(n);
 }
 
-function toggleEdit(){
-  editMode=!editMode; selDrag=null;
-  document.getElementById('btn-edit').className=editMode?'btn btn-active':'btn btn-outline';
-  document.getElementById('btn-save').style.display=editMode?'inline-block':'none';
-  document.getElementById('edit-bar').className=editMode?'edit-bar on':'edit-bar';
-  if(fpImgEl)fpImgEl.style.cursor=editMode?'crosshair':'default';
+function toggleEdit() {
+  editMode = !editMode; selDrag = null;
+  document.getElementById('btn-edit').className = editMode ? 'btn btn-active' : 'btn btn-outline';
+  document.getElementById('btn-save').style.display = editMode ? 'inline-block' : 'none';
+  document.getElementById('edit-bar').className = editMode ? 'edit-bar on' : 'edit-bar';
+  if (fpImgEl) fpImgEl.style.cursor = editMode ? 'crosshair' : 'default';
   renderFpList(); renderPins();
 }
 
-async function saveLayout(){
-  await fetch('/api/floorplan/layout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(fp.cameras||{})});
-  if(editMode)toggleEdit();
+async function saveLayout() {
+  await fetch('/api/floorplan/layout', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(fp.cameras || {})
+  });
+  if (editMode) toggleEdit();
 }
 
-function clearLayout(){
-  if(!confirm('Xoá toàn bộ vị trí trên sơ đồ?'))return;
-  fp.cameras={}; renderFpList(); renderPins();
+function clearLayout() {
+  if (!confirm('Xoá toàn bộ vị trí trên sơ đồ?')) return;
+  fp.cameras = {}; renderFpList(); renderPins();
 }
 
-function switchTab(t){
-  curTab=t;
-  document.querySelectorAll('.tab').forEach((el,i)=>el.className='tab'+(['grid','floor'][i]===t?' active':''));
-  document.getElementById('view-grid').className='view'+(t==='grid'?' active':'');
-  document.getElementById('view-floor').className='view'+(t==='floor'?' active':'');
-  document.getElementById('tb-grid').style.display=t==='grid'?'flex':'none';
-  document.getElementById('tb-floor').style.display=t==='floor'?'flex':'none';
-  if(t==='floor')fetchFp();
+// ── Tab switching ──────────────────────────────────────────────────────────
+function switchTab(t) {
+  curTab = t;
+  const tabs = ['grid', 'floor', 'alerts'];
+  document.querySelectorAll('.tab').forEach((el, i) =>
+    el.className = 'tab' + (tabs[i] === t ? ' active' : '')
+  );
+  tabs.forEach(name => {
+    document.getElementById('view-' + name).className = 'view' + (name === t ? ' active' : '');
+    const tb = document.getElementById('tb-' + name);
+    if (tb) tb.style.display = name === t ? 'flex' : 'none';
+  });
+  if (t === 'floor') fetchFp();
+  if (t === 'alerts') {
+    newAlertCount = 0;
+    document.getElementById('alert-badge').classList.remove('on');
+    fetchAlerts();
+  }
 }
 
-setInterval(()=>document.getElementById('clock').textContent=new Date().toLocaleTimeString('vi-VN'),1000);
-setInterval(fetchCameras,15000);
+// ── Init ───────────────────────────────────────────────────────────────────
+setInterval(() => document.getElementById('clock').textContent = new Date().toLocaleTimeString('vi-VN'), 1000);
+setInterval(fetchCameras, 15000);
+setInterval(fetchFrigateStatus, 30000);
+
+connectWS();
 fetchCameras();
+fetchFrigateStatus();
+fetchAlerts();
 </script>
 </body>
 </html>

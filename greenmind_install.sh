@@ -311,6 +311,8 @@ setup_dashboard() {
 
     run_with_process "Tải dashboard frontend" curl -fsSL         https://raw.githubusercontent.com/greenfield16/greenmind/main/templates/index.html         -o "$GREENMIND_DIR/templates/index.html"
 
+    run_with_process "Tải dashboard styles" curl -fsSL         https://raw.githubusercontent.com/greenfield16/greenmind/main/templates/style.css         -o "$GREENMIND_DIR/templates/style.css"
+
     # Cài dependencies
     run_with_process "Cài FastAPI + uvicorn" "$VENV_PATH/bin/pip" install fastapi "uvicorn[standard]" opencv-python-headless -q
 
