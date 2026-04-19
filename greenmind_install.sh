@@ -111,9 +111,11 @@ fi
 # --- Kết nối Node về Gateway ---
 if [[ "$NODE_ROLE" == "node" ]]; then
     echo -e "\n${BOLD}${CYAN}🔗 KẾT NỐI NODE VỀ GATEWAY${NC}"
-    openclaw connect --gateway "$GATEWAY_ADDR" --token "$GATEWAY_TOKEN" 2>/dev/null && \
-        echo -e "${GREEN} [✓] Đã kết nối: $GATEWAY_ADDR${NC}" || \
-        echo -e "${YELLOW} [!] Chạy thủ công: openclaw connect --gateway $GATEWAY_ADDR --token $GATEWAY_TOKEN${NC}"
+    echo -e "${CYAN}  Chạy lệnh sau để kết nối Node về Gateway:${NC}"
+    echo -e "${BOLD}  greenmind-connect --gateway $GATEWAY_ADDR --token $GATEWAY_TOKEN${NC}" 2>/dev/null || \
+    echo -e "${YELLOW}  Cấu hình thủ công trong: $CONFIG_FILE${NC}"
+    echo -e "  ${CYAN}GATEWAY_URL=$GATEWAY_ADDR${NC}"
+    echo -e "  ${CYAN}GATEWAY_TOKEN=$GATEWAY_TOKEN${NC}"
 fi
 
 # --- Progress 100% ---
@@ -129,11 +131,18 @@ echo -e "${NC}"
 
 if [[ "$NODE_ROLE" == "gateway" ]]; then
     LAN_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
+    # Tạo pairing token ngẫu nhiên nếu chưa có
+    if ! grep -q "PAIRING_TOKEN" "$CONFIG_FILE" 2>/dev/null; then
+        PAIRING_TOKEN=$(openssl rand -hex 16)
+        echo "PAIRING_TOKEN=$PAIRING_TOKEN" >> "$CONFIG_FILE"
+    else
+        PAIRING_TOKEN=$(grep "PAIRING_TOKEN" "$CONFIG_FILE" | cut -d= -f2)
+    fi
     echo -e "${CYAN}  📊 Dashboard : http://localhost:${GREENMIND_PORT}${NC}"
     [[ -n "$LAN_IP" ]] && \
     echo -e "${CYAN}  🌐 LAN       : http://$LAN_IP:${GREENMIND_PORT}${NC}"
     echo -e "${CYAN}  ⚙️  Config    : /etc/greenmind/config.env${NC}"
-    echo -e "${CYAN}  🔑 Node token: openclaw gateway token${NC}"
+    echo -e "${CYAN}  🔑 Node token: ${BOLD}$PAIRING_TOKEN${NC}"
 else
     echo -e "${CYAN}  📡 Node đã kết nối về Gateway: $GATEWAY_ADDR${NC}"
 fi
