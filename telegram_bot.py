@@ -115,7 +115,7 @@ def ai_analyze_image(photo_bytes, cam_name):
             import google.generativeai as genai
             import PIL.Image, io
             genai.configure(api_key=key)
-            model = genai.GenerativeModel('gemini-2.0-flash')
+            model = genai.GenerativeModel('gemini-2.5-flash-preview-04-17')
             img = PIL.Image.open(io.BytesIO(photo_bytes))
             resp = model.generate_content([prompt, img])
             return resp.text.strip()
