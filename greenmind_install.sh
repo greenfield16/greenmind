@@ -9,13 +9,18 @@ BASE_URL="https://raw.githubusercontent.com/greenfield16/greenmind/main"
 INSTALLER_URL="$BASE_URL/installers"
 
 # --- Load từng module qua source ---
+_TMPDIR=$(mktemp -d)
+trap "rm -rf $_TMPDIR" EXIT
+
 _load() {
     local name=$1
     local local_path="$(dirname "$0")/installers/${name}.sh"
     if [ -f "$local_path" ]; then
         source "$local_path"
     else
-        source <(curl -fsSL "$INSTALLER_URL/${name}.sh")
+        local tmp="$_TMPDIR/${name}.sh"
+        curl -fsSL "$INSTALLER_URL/${name}.sh" -o "$tmp"
+        source "$tmp"
     fi
 }
 
