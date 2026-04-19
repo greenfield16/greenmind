@@ -529,7 +529,7 @@ def frigate_status():
     return JSONResponse({'online': False, 'url': FRIGATE_URL})
 
 @app.get('/api/frigate/recordings/{name}')
-def frigate_recordings(name: str, limit: int = 20):
+def frigate_recordings(name: str, limit: int = 30):
     """Lấy danh sách recording từ Frigate cho 1 camera."""
     try:
         r = requests.get(f'{FRIGATE_URL}/api/{name.lower()}/recordings', timeout=5)
@@ -537,7 +537,27 @@ def frigate_recordings(name: str, limit: int = 20):
             return JSONResponse(r.json()[:limit])
     except Exception as e:
         return JSONResponse({'error': str(e)}, status_code=502)
-    return JSONResponse([], status_code=200)
+    return JSONResponse([])
+
+@app.get('/api/frigate/stream/{name}/{recording_id}')
+def frigate_stream(name: str, recording_id: str):
+    """Proxy video stream từ Frigate về browser."""
+    try:
+        url = f'{FRIGATE_URL}/vod/recording/{recording_id}/index.m3u8'
+        r = requests.get(url, timeout=5, stream=True)
+        if r.status_code == 200:
+            return Response(
+                content=r.content,
+                media_type=r.headers.get('Content-Type', 'application/x-mpegurl')
+            )
+        # Fallback: thử mp4 trực tiếp
+        url_mp4 = f'{FRIGATE_URL}/api/recording/{recording_id}/clip.mp4'
+        r2 = requests.get(url_mp4, timeout=10, stream=True)
+        if r2.status_code == 200:
+            return Response(content=r2.content, media_type='video/mp4')
+    except Exception as e:
+        log.warning(f'Stream {recording_id}: {e}')
+    return Response(status_code=404)
 
 # ── Floorplan API ─────────────────────────────────────────────────────────────
 @app.get('/api/floorplan')
@@ -573,6 +593,24 @@ async def save_layout(request_data: dict):
     fp['cameras'] = request_data
     save_floorplan(fp)
     return JSONResponse({'ok': True, 'saved': len(request_data)})
+
+@app.get('/static/manifest.json')
+def serve_manifest():
+    p = DATA_DIR / 'templates' / 'manifest.json'
+    if not p.exists():
+        p = Path(__file__).parent / 'templates' / 'manifest.json'
+    if p.exists():
+        return Response(p.read_text(), media_type='application/manifest+json')
+    return Response(status_code=404)
+
+@app.get('/static/sw.js')
+def serve_sw():
+    p = DATA_DIR / 'templates' / 'sw.js'
+    if not p.exists():
+        p = Path(__file__).parent / 'templates' / 'sw.js'
+    if p.exists():
+        return Response(p.read_text(), media_type='application/javascript')
+    return Response(status_code=404)
 
 # ── Login page ────────────────────────────────────────────────────────────────
 @app.get('/login', response_class=HTMLResponse)

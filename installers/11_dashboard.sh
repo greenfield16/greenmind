@@ -17,6 +17,8 @@ setup_dashboard() {
     run_with_process "Tải dashboard backend"  curl -fsSL "$BASE_URL/dashboard.py"          -o "$GREENMIND_DIR/dashboard.py"
     run_with_process "Tải dashboard frontend" curl -fsSL "$BASE_URL/templates/index.html"  -o "$GREENMIND_DIR/templates/index.html"
     run_with_process "Tải dashboard styles"   curl -fsSL "$BASE_URL/templates/style.css"   -o "$GREENMIND_DIR/templates/style.css"
+    run_with_process "Tải PWA manifest"       curl -fsSL "$BASE_URL/templates/manifest.json" -o "$GREENMIND_DIR/templates/manifest.json"
+    run_with_process "Tải Service Worker"     curl -fsSL "$BASE_URL/templates/sw.js"       -o "$GREENMIND_DIR/templates/sw.js"
 
     local PORT="$GREENMIND_PORT"
 

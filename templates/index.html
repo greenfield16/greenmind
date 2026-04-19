@@ -5,6 +5,11 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>🌿 Greenmind Dashboard</title>
 <link rel="stylesheet" href="/static/style.css">
+<link rel="manifest" href="/static/manifest.json">
+<meta name="theme-color" content="#4caf7d">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Greenmind">
 </head>
 <body>
 
@@ -37,6 +42,7 @@
   <div class="tab active" onclick="switchTab('grid')">⊞ Grid</div>
   <div class="tab" onclick="switchTab('floor')">🗺 Sơ đồ toà nhà</div>
   <div class="tab" onclick="switchTab('alerts')">🔔 Cảnh báo<span class="tab-badge" id="alert-badge">0</span></div>
+  <div class="tab" onclick="switchTab('recordings')">🎬 Recordings</div>
 </div>
 
 <!-- Toolbars -->
@@ -94,6 +100,43 @@
         • Edit mode → xoá vị trí<br>
         • View mode → xem snapshot
       </div>
+    </div>
+  </div>
+</div>
+
+<div class="toolbar" id="tb-recordings" style="display:none">
+  <select id="rec-cam-filter" class="search" style="width:200px;margin-left:0" onchange="fetchRecordings()">
+    <option value="">📷 Tất cả camera</option>
+  </select>
+  <button class="btn btn-primary" onclick="fetchRecordings()">🔄 Refresh</button>
+  <span style="font-size:12px;color:#666;margin-left:8px">Clip từ Frigate NVR</span>
+</div>
+
+<!-- View: Recordings -->
+<div class="view" id="view-recordings">
+  <div id="rec-frigate-warn" style="display:none;background:#f5a62322;border:1px solid #f5a62344;border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:13px;color:#f5a623">
+    ⚠️ Frigate chưa online — Recordings không khả dụng. Cài Frigate để xem lại clip.
+  </div>
+  <div class="rec-layout">
+    <!-- Sidebar: danh sách cam -->
+    <div class="rec-sidebar">
+      <div class="rec-sidebar-title">📷 Camera</div>
+      <div id="rec-cam-list"></div>
+    </div>
+    <!-- Main: danh sách clip -->
+    <div class="rec-main">
+      <div id="rec-list"><div class="no-alerts"><div class="big">🎬</div><div>Chọn camera để xem recordings.</div></div></div>
+    </div>
+  </div>
+  <!-- Video player popup -->
+  <div class="rec-player" id="rec-player" style="display:none">
+    <div class="rec-player-box">
+      <div class="rec-player-header">
+        <span id="rec-player-title">Đang phát...</span>
+        <button onclick="closePlayer()" style="background:none;border:none;color:#aaa;font-size:20px;cursor:pointer">✕</button>
+      </div>
+      <video id="rec-video" controls autoplay style="width:100%;border-radius:8px;background:#000;max-height:60vh"></video>
+      <div id="rec-player-info" style="font-size:12px;color:#666;margin-top:8px"></div>
     </div>
   </div>
 </div>
@@ -185,6 +228,11 @@ function onNewAlert(alert) {
 
   allAlerts.unshift(alert);
   if (allAlerts.length > 200) allAlerts.pop();
+
+  // Gửi alert sang Service Worker để hiện push notification
+  if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+    navigator.serviceWorker.controller.postMessage({ type: 'ALERT', ...alert });
+  }
 
   // Flash card
   const card = document.getElementById('card-' + alert.cam);
@@ -495,12 +543,13 @@ function clearLayout() {
 // ── Tab switching ──────────────────────────────────────────────────────────
 function switchTab(t) {
   curTab = t;
-  const tabs = ['grid', 'floor', 'alerts'];
+  const tabs = ['grid', 'floor', 'alerts', 'recordings'];
   document.querySelectorAll('.tab').forEach((el, i) =>
     el.className = 'tab' + (tabs[i] === t ? ' active' : '')
   );
   tabs.forEach(name => {
-    document.getElementById('view-' + name).className = 'view' + (name === t ? ' active' : '');
+    const v = document.getElementById('view-' + name);
+    if (v) v.className = 'view' + (name === t ? ' active' : '');
     const tb = document.getElementById('tb-' + name);
     if (tb) tb.style.display = name === t ? 'flex' : 'none';
   });
@@ -510,9 +559,114 @@ function switchTab(t) {
     document.getElementById('alert-badge').classList.remove('on');
     fetchAlerts();
   }
+  if (t === 'recordings') fetchRecordings();
+}
+
+// ── Recordings ─────────────────────────────────────────────────────────────
+let recCams = [], selRecCam = null;
+
+async function fetchRecordings() {
+  const warn = document.getElementById('rec-frigate-warn');
+  if (!frigateOnline) { warn.style.display = 'block'; return; }
+  warn.style.display = 'none';
+
+  // Populate cam filter + sidebar
+  const filter = document.getElementById('rec-cam-filter');
+  const sidebar = document.getElementById('rec-cam-list');
+  if (allCams.length && filter.options.length === 1) {
+    allCams.forEach(c => {
+      const o = document.createElement('option');
+      o.value = c.name; o.textContent = c.name;
+      filter.appendChild(o);
+    });
+    sidebar.innerHTML = allCams.map(c => `
+      <div class="rec-cam-item ${selRecCam===c.name?'active':''}"
+           onclick="selectRecCam('${c.name}')">
+        <span>${c.online?'🟢':'🔴'}</span> ${c.name}
+      </div>`).join('');
+  }
+
+  const cam = selRecCam || filter.value || (allCams[0] && allCams[0].name);
+  if (!cam) return;
+  selRecCam = cam;
+
+  // Highlight sidebar
+  document.querySelectorAll('.rec-cam-item').forEach(el => {
+    el.classList.toggle('active', el.textContent.trim().includes(cam));
+  });
+
+  const list = document.getElementById('rec-list');
+  list.innerHTML = '<div style="color:#555;padding:40px;text-align:center">⏳ Đang tải...</div>';
+
+  try {
+    const r = await fetch(`/api/frigate/recordings/${cam.toLowerCase()}?limit=30`);
+    const recs = await r.json();
+    if (!recs.length) {
+      list.innerHTML = '<div class="no-alerts"><div class="big">🎬</div><div>Không có recording nào.</div></div>';
+      return;
+    }
+    list.innerHTML = `<div class="rec-grid">${recs.map(rec => {
+      const start = new Date(rec.start_time * 1000);
+      const end   = new Date(rec.end_time   * 1000);
+      const dur   = Math.round((rec.end_time - rec.start_time));
+      const durStr = dur >= 60 ? `${Math.floor(dur/60)}m${dur%60}s` : `${dur}s`;
+      const videoUrl = `${frigateOnline ? '/api/frigate/video/' + cam.toLowerCase() + '/' + rec.id : '#'}`;
+      return `<div class="rec-card" onclick="playRecording('${cam}','${rec.id}','${start.toLocaleString('vi-VN')}')">
+        <div class="rec-thumb">
+          <div class="rec-play-btn">▶</div>
+          <div class="rec-duration">${durStr}</div>
+        </div>
+        <div class="rec-info">
+          <div class="rec-time">${start.toLocaleTimeString('vi-VN')}</div>
+          <div class="rec-date">${start.toLocaleDateString('vi-VN')}</div>
+          ${rec.motion ? '<span class="rec-tag">🏃 Motion</span>' : ''}
+          ${rec.objects && rec.objects.length ? `<span class="rec-tag rec-tag-alert">👤 ${rec.objects.join(', ')}</span>` : ''}
+        </div>
+      </div>`;
+    }).join('')}</div>`;
+  } catch (e) {
+    list.innerHTML = `<div class="no-alerts"><div class="big">❌</div><div>Lỗi tải recordings: ${e.message}</div></div>`;
+  }
+}
+
+function selectRecCam(name) {
+  selRecCam = name;
+  document.getElementById('rec-cam-filter').value = name;
+  fetchRecordings();
+}
+
+function playRecording(cam, id, title) {
+  const player = document.getElementById('rec-player');
+  const video  = document.getElementById('rec-video');
+  const ptitle = document.getElementById('rec-player-title');
+  const info   = document.getElementById('rec-player-info');
+  const url    = `${location.protocol}//${location.hostname}:5000/vod/2024-01/${cam.toLowerCase()}/${id}/index.m3u8`;
+  ptitle.textContent = `📷 ${cam} — ${title}`;
+  info.textContent   = `Frigate recording ID: ${id}`;
+  video.src = `/api/frigate/stream/${cam.toLowerCase()}/${id}`;
+  player.style.display = 'flex';
+  video.play().catch(() => {});
+}
+
+function closePlayer() {
+  const video = document.getElementById('rec-video');
+  video.pause(); video.src = '';
+  document.getElementById('rec-player').style.display = 'none';
 }
 
 // ── Init ───────────────────────────────────────────────────────────────────
+// PWA: đăng ký Service Worker
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/static/sw.js').catch(() => {});
+}
+
+// Push notification permission
+async function requestNotifPermission() {
+  if ('Notification' in window && Notification.permission === 'default') {
+    await Notification.requestPermission();
+  }
+}
+requestNotifPermission();
 setInterval(() => document.getElementById('clock').textContent = new Date().toLocaleTimeString('vi-VN'), 1000);
 setInterval(fetchCameras, 15000);
 setInterval(fetchFrigateStatus, 30000);
