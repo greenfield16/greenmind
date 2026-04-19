@@ -15,7 +15,7 @@ setup_telegram() {
     echo -e "   • Nhận cảnh báo AI tự động (ảnh + mô tả)"
     echo -e "   • Nhắn lệnh: /snap <cam>, /status, /cams, /alerts\n"
 
-    read -p "👉 Cấu hình Telegram Bot? (y/n, mặc định y): " setup_tg
+    read -p "👉 Cấu hình Telegram Bot? (y/n, mặc định y): " setup_tg </dev/tty
     setup_tg="${setup_tg:-y}"
 
     if [[ ! "$setup_tg" =~ ^[Yy]$ ]]; then
@@ -29,8 +29,8 @@ setup_telegram() {
     echo -e "   3. Nhắn thử bot của bạn 1 tin → lấy Chat ID tại:"
     echo -e "      https://api.telegram.org/bot<TOKEN>/getUpdates\n"
 
-    read -p "Nhập Telegram Bot Token: " tg_token
-    read -p "Nhập Chat ID của bạn:    " tg_chat
+    read -p "Nhập Telegram Bot Token: " tg_token </dev/tty
+    read -p "Nhập Chat ID của bạn:    " tg_chat </dev/tty
 
     # Kiểm tra token hợp lệ
     local test_result

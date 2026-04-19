@@ -13,7 +13,7 @@ setup_frigate() {
 
     echo -e "${CYAN}🎥 Frigate: NVR mã nguồn mở, AI phát hiện người/xe/vật thể.${NC}"
     echo -e "   Yêu cầu: Docker | RAM ≥ 4GB\n"
-    read -p "👉 Cài Frigate? (y/n, mặc định n): " install_frigate
+    read -p "👉 Cài Frigate? (y/n, mặc định n): " install_frigate </dev/tty
     [[ ! "$install_frigate" =~ ^[Yy]$ ]] && { echo -e "${YELLOW}⏭ Bỏ qua.${NC}"; return 0; }
 
     # Docker

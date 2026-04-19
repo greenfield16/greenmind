@@ -18,7 +18,7 @@ setup_ai_engines() {
     echo -e "       🔑 ${BOLD}https://build.nvidia.com/google/gemma-4-31b-it${NC}"
     echo -e "  ${BLUE}3)${NC} 🖥  Local AI (Ollama) — Chạy offline hoàn toàn, cần máy mạnh"
     echo -e "  ${BLUE}4)${NC} ⏭  Bỏ qua — cấu hình sau\n"
-    read -p "👉 Lựa chọn (1-4): " engine_choice
+    read -p "👉 Lựa chọn (1-4): " engine_choice </dev/tty
 
     case "$engine_choice" in
         1) _setup_gemini   ;;
@@ -35,7 +35,7 @@ _setup_gemini() {
     echo -e "\n${CYAN}📋 Lấy Gemini API Key:${NC}"
     echo -e "   1. Truy cập: ${BOLD}https://aistudio.google.com/app/apikey${NC}"
     echo -e "   2. Đăng nhập Google → \"Create API Key\" → Copy\n"
-    read -p "Nhập Gemini API Key: " gemini_key
+    read -p "Nhập Gemini API Key: " gemini_key </dev/tty
     if [[ -z "$gemini_key" ]]; then
         echo -e "${YELLOW}⏭ Bỏ qua Gemini.${NC}"; return
     fi
@@ -50,7 +50,7 @@ _setup_nvidia() {
     echo -e "\n${CYAN}📋 Lấy NVIDIA NIM API Key:${NC}"
     echo -e "   1. Truy cập: ${BOLD}https://build.nvidia.com/google/gemma-4-31b-it${NC}"
     echo -e "   2. Đăng nhập NVIDIA → \"Get API Key\" → Copy\n"
-    read -p "Nhập NVIDIA NIM API Key: " nvidia_key
+    read -p "Nhập NVIDIA NIM API Key: " nvidia_key </dev/tty
     if [[ -z "$nvidia_key" ]]; then
         echo -e "${YELLOW}⏭ Bỏ qua NVIDIA NIM.${NC}"; return
     fi
@@ -124,7 +124,7 @@ _setup_ollama() {
     echo -e "  ${BLUE}7)${NC} gemma3:27b     — Tối thiểu 18GB RAM | Workstation"
     echo -e "  ${BLUE}8)${NC} llava:34b      — Tối thiểu 20GB RAM | Mạnh nhất"
     echo -e "  ${BLUE}9)${NC} Nhập tên model khác (tìm tại ollama.com/library)\n"
-    read -p "👉 Chọn model (mặc định: $SUGGESTED): " model_choice
+    read -p "👉 Chọn model (mặc định: $SUGGESTED): " model_choice </dev/tty
 
     case "$model_choice" in
         1) SELECTED_MODEL="gemma3:2b"     ;;
@@ -135,7 +135,7 @@ _setup_ollama() {
         6) SELECTED_MODEL="llava:13b"     ;;
         7) SELECTED_MODEL="gemma3:27b"    ;;
         8) SELECTED_MODEL="llava:34b"     ;;
-        9) read -p "Nhập tên model (VD: mistral:7b): " SELECTED_MODEL ;;
+        9) read -p "Nhập tên model (VD: mistral:7b): " SELECTED_MODEL </dev/tty ;;
         "") SELECTED_MODEL="$SUGGESTED"   ;;
         *) SELECTED_MODEL="$SUGGESTED"    ;;
     esac

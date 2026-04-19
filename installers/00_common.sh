@@ -72,7 +72,7 @@ ask_continue() {
     local step_name="$1"
     if [[ "$INSTALL_MODE" == "step" ]]; then
         echo ""
-        read -p "👉 Tiếp tục cài ${step_name}? (y/n, mặc định y): " _ans
+        read -p "👉 Tiếp tục cài ${step_name}? (y/n, mặc định y): " _ans </dev/tty
         _ans="${_ans:-y}"
         [[ "$_ans" =~ ^[Yy]$ ]]
     else

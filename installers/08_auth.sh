@@ -13,7 +13,7 @@ setup_auth() {
 
     echo -e "${CYAN}🔐 Thiết lập mật khẩu đăng nhập Dashboard.${NC}"
     echo -e "   Nếu bỏ qua, dashboard sẽ không có mật khẩu (chỉ nên dùng trong LAN nội bộ).\n"
-    read -p "👉 Thiết lập mật khẩu đăng nhập? (y/n, mặc định y): " setup_pass
+    read -p "👉 Thiết lập mật khẩu đăng nhập? (y/n, mặc định y): " setup_pass </dev/tty
     setup_pass="${setup_pass:-y}"
 
     if [[ ! "$setup_pass" =~ ^[Yy]$ ]]; then
@@ -24,7 +24,7 @@ setup_auth() {
 
     local username password password2
 
-    read -p "Tên đăng nhập (mặc định: admin): " username
+    read -p "Tên đăng nhập (mặc định: admin): " username </dev/tty
     username="${username:-admin}"
 
     while true; do

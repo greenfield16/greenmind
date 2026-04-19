@@ -38,7 +38,7 @@ show_intro() {
     echo -e "  ${BLUE}1)${NC} 🚀 Tự động  — Cài toàn bộ, chỉ hỏi thông tin cần thiết"
     echo -e "  ${BLUE}2)${NC} 🔧 Từng bước — Xác nhận trước mỗi bước, linh hoạt hơn"
     echo ""
-    read -p "👉 Chọn chế độ (1/2, mặc định 1): " _mode_choice
+    read -p "👉 Chọn chế độ (1/2, mặc định 1): " _mode_choice </dev/tty
     case "$_mode_choice" in
         2)
             export INSTALL_MODE="step"

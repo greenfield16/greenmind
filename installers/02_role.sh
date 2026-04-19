@@ -12,13 +12,13 @@ select_node_role() {
     echo -e "  ${BLUE}2)${NC} 📡 Node     — Tai mắt: cài nhẹ, chuyên camera/cảm biến/relay"
     echo -e "               Phù hợp: Tinkerboard, Raspberry Pi, máy yếu"
     echo ""
-    read -p "👉 Chọn vai trò (1/2, mặc định 1): " role_choice
+    read -p "👉 Chọn vai trò (1/2, mặc định 1): " role_choice </dev/tty
     case "$role_choice" in
         2)
             export NODE_ROLE="node"
             echo -e "${GREEN} [✓] Chế độ NODE — Sẽ bỏ qua cài AI Engine nặng.${NC}"
-            read -p "Nhập IP/Domain của Gateway (VD: 192.168.1.100 hoặc myhome.ddns.net): " GATEWAY_ADDR
-            read -p "Nhập Pairing Token từ Gateway: " GATEWAY_TOKEN
+            read -p "Nhập IP/Domain của Gateway (VD: 192.168.1.100 hoặc myhome.ddns.net): " GATEWAY_ADDR </dev/tty
+            read -p "Nhập Pairing Token từ Gateway: " GATEWAY_TOKEN </dev/tty
             export GATEWAY_ADDR GATEWAY_TOKEN
             ;;
         *)
