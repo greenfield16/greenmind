@@ -114,7 +114,7 @@ def ai_analyze_image(photo_bytes, cam_name):
         resp = requests.post(
             f'{ollama_url}/api/generate',
             json={'model': engine, 'prompt': prompt, 'images': [img_b64], 'stream': False},
-            timeout=60
+            timeout=120
         )
         if resp.status_code == 200:
             result = resp.json().get('response', '').strip()
