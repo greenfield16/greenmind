@@ -81,6 +81,21 @@ def api_capture(cam_name):
         return False
 
 # ── AI Analysis ────────────────────────────────────────────────────────────
+def resize_image(photo_bytes, max_width=640):
+    """Resize ảnh xuống max_width để giảm tải cho AI local."""
+    try:
+        import PIL.Image, io
+        img = PIL.Image.open(io.BytesIO(photo_bytes))
+        if img.width > max_width:
+            ratio  = max_width / img.width
+            new_h  = int(img.height * ratio)
+            img    = img.resize((max_width, new_h), PIL.Image.LANCZOS)
+        buf = io.BytesIO()
+        img.save(buf, format='JPEG', quality=75)
+        return buf.getvalue()
+    except Exception:
+        return photo_bytes  # fallback ảnh gốc nếu lỗi
+
 def ai_analyze_image(photo_bytes, cam_name):
     cfg2   = load_env()
     engine = cfg2.get('AI_ENGINE', 'gemini')
@@ -107,10 +122,11 @@ def ai_analyze_image(photo_bytes, cam_name):
         except Exception as e:
             return f'⚠️ Gemini lỗi: {str(e)[:100]}'
 
-    # Ollama local
-    ollama_url = cfg2.get('OLLAMA_URL', 'http://localhost:11434')
+    # Ollama local — resize ảnh trước để giảm tải CPU
+    ollama_url  = cfg2.get('OLLAMA_URL', 'http://localhost:11434')
+    small_bytes = resize_image(photo_bytes, max_width=640)
     try:
-        img_b64 = base64.b64encode(photo_bytes).decode()
+        img_b64 = base64.b64encode(small_bytes).decode()
         resp = requests.post(
             f'{ollama_url}/api/generate',
             json={'model': engine, 'prompt': prompt, 'images': [img_b64], 'stream': False},
