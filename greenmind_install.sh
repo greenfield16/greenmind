@@ -19,7 +19,8 @@ if [ "$ROLE" = "gateway" ]; then
               03_gateway/03_venv.sh \
               03_gateway/04_ai.sh \
               03_gateway/05_config.sh \
-              03_gateway/06_service.sh; do
+              03_gateway/06_service.sh \
+              03_gateway/07_openclaw.sh; do
         _load "$f"
     done
 else
