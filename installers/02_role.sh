@@ -1,16 +1,18 @@
 #!/bin/bash
 # 🌿 02_role.sh — Chọn vai trò
 
-show_progress 1 6 "Chọn vai trò"
-
-echo -e "\n${BOLD}Chọn vai trò cài đặt:${NC}"
-echo "  1) Gateway — Máy chủ trung tâm (AI, Dashboard, Telegram)"
-echo "     Yêu cầu: RAM ≥ 2GB, có IP public hoặc domain"
 echo ""
-echo "  2) Node    — Hub thiết bị tại địa điểm (Camera, Cảm biến, Chấm công...)"
-echo "     Yêu cầu: RAM ≥ 512MB, cùng LAN với thiết bị"
+echo -e "  ${BOLD}Chọn vai trò cài đặt:${NC}"
 echo ""
-read -rp "Chọn [1/2]: " ROLE_CHOICE
+echo -e "  ${GREEN}${BOLD}  1) Gateway${NC}  — Não trung tâm (AI, Dashboard, Telegram)"
+echo -e "  ${DIM}              Yêu cầu: RAM ≥ 2GB · Có IP/domain public${NC}"
+echo -e "  ${DIM}              Phù hợp: VPS, PC, Mac Mini, Raspberry Pi 4${NC}"
+echo ""
+echo -e "  ${CYAN}${BOLD}  2) Node${NC}     — Tai mắt tại hiện trường (Camera, Cảm biến)"
+echo -e "  ${DIM}              Yêu cầu: RAM ≥ 512MB · Cùng LAN với thiết bị${NC}"
+echo -e "  ${DIM}              Phù hợp: Raspberry Pi, Tinkerboard, Orange Pi${NC}"
+echo ""
+read -rp "  Chọn [1/2]: " ROLE_CHOICE
 
 case "$ROLE_CHOICE" in
     1) export ROLE=gateway; print_success "Vai trò: Gateway" ;;

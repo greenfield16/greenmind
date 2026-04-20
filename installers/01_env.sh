@@ -1,8 +1,18 @@
 #!/bin/bash
-# 🌿 01_env.sh — Kiểm tra môi trường
+# 🌿 01_env.sh — Banner + kiểm tra môi trường
 
-echo -e "\n${BOLD}🌿 Greenmind v3.0 — Smart Building AI Platform${NC}"
-echo -e "${CYAN}================================================${NC}\n"
+clear
+echo -e "${GREEN}${BOLD}"
+echo "    ██████╗ ██████╗ ███████╗███████╗███╗   ██╗███╗   ███╗██╗███╗   ██╗██████╗ "
+echo "   ██╔════╝ ██╔══██╗██╔════╝██╔════╝████╗  ██║████╗ ████║██║████╗  ██║██╔══██╗"
+echo "   ██║  ███╗██████╔╝█████╗  █████╗  ██╔██╗ ██║██╔████╔██║██║██╔██╗ ██║██║  ██║"
+echo "   ██║   ██║██╔══██╗██╔══╝  ██╔══╝  ██║╚██╗██║██║╚██╔╝██║██║██║╚██╗██║██║  ██║"
+echo "   ╚██████╔╝██║  ██║███████╗███████╗██║ ╚████║██║ ╚═╝ ██║██║██║ ╚████║██████╔╝"
+echo "    ╚═════╝ ╚═╝  ╚═╝╚══════╝╚══════╝╚═╝  ╚═══╝╚═╝     ╚═╝╚═╝╚═╝  ╚═══╝╚═════╝ "
+echo -e "${NC}"
+echo -e "  ${CYAN}${BOLD}Smart Building AI Platform${NC}  ${DIM}v3.1 by Greenfield Tech${NC}"
+echo -e "  ${DIM}──────────────────────────────────────────────────${NC}"
+echo ""
 
 # Kiểm tra root
 if [ "$EUID" -ne 0 ]; then
@@ -16,22 +26,29 @@ if ! command -v apt-get &>/dev/null; then
     exit 1
 fi
 
-# Kiểm tra RAM
+# System info
 RAM_MB=$(free -m | awk '/^Mem:/{print $2}')
+CPU_CORES=$(nproc)
+DISK_FREE=$(df -h / | awk 'NR==2{print $4}')
+OS_NAME=$(. /etc/os-release && echo "$PRETTY_NAME")
+HOST=$(hostname)
+
+echo -e "  ${BOLD}Thông tin hệ thống:${NC}"
+echo -e "  ${DIM}  OS      :${NC} $OS_NAME"
+echo -e "  ${DIM}  Host    :${NC} $HOST"
+echo -e "  ${DIM}  RAM     :${NC} ${RAM_MB}MB"
+echo -e "  ${DIM}  CPU     :${NC} ${CPU_CORES} cores"
+echo -e "  ${DIM}  Disk    :${NC} ${DISK_FREE} trống"
+echo ""
+
+# Check RAM
 if [ "$RAM_MB" -lt 512 ]; then
     print_warn "RAM thấp (${RAM_MB}MB) — có thể ảnh hưởng hiệu suất"
 fi
-print_info "RAM: ${RAM_MB}MB"
 
-# Chọn chế độ cài
-echo -e "\n${BOLD}Chọn chế độ cài đặt:${NC}"
-echo "  1) Tự động (không hỏi xác nhận)"
-echo "  2) Từng bước (xác nhận mỗi bước)"
-read -rp "Chọn [1/2, mặc định: 1]: " MODE_CHOICE
-if [ "$MODE_CHOICE" = "2" ]; then
-    export AUTO_MODE=0
-    print_info "Chế độ: từng bước"
-else
-    export AUTO_MODE=1
-    print_info "Chế độ: tự động"
+# Check internet
+if ! curl -fsSL --connect-timeout 5 https://github.com > /dev/null 2>&1; then
+    print_error "Không có kết nối internet"
+    exit 1
 fi
+print_success "Kết nối internet OK"
