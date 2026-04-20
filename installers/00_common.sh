@@ -3,7 +3,8 @@
 
 # Colors
 GREEN='\033[0;32m'; YELLOW='\033[1;33m'; RED='\033[0;31m'; CYAN='\033[0;36m'
-ORANGE='\033[0;33m'; WHITE='\033[1;37m'; NC='\033[0m'; BOLD='\033[1m'; DIM='\033[2m'
+GREEN=\033[0;32m
+ORANGE=\033[0;33m'; WHITE='\033[1;37m'; NC='\033[0m'; BOLD='\033[1m'; DIM='\033[2m'
 
 INSTALL_DIR=/opt/greenmind
 CONFIG_FILE=/etc/greenmind/config.env
@@ -14,7 +15,7 @@ AUTO_MODE=0
 oc_section() {
     local title="$1"; shift
     echo ""
-    echo -e "${ORANGE}${BOLD}◆ ${title}${NC}"
+    echo -e "${GREEN}${BOLD}◆ ${title}${NC}"
     echo -e "  ${DIM}│${NC}"
     for line in "$@"; do
         if [ -z "$line" ]; then
@@ -31,7 +32,7 @@ oc_section() {
 oc_confirm() {
     local msg="$1"
     echo ""
-    echo -e "${ORANGE}◇ ${WHITE}${msg}${NC}"
+    echo -e "${GREEN}◇ ${WHITE}${msg}${NC}"
     echo -ne "  ${DIM}Yes${NC} / No: "
     local yn
     read -r yn
@@ -47,11 +48,11 @@ oc_radio() {
     local selected=0
 
     echo ""
-    echo -e "${ORANGE}◇ ${WHITE}${msg}${NC}"
+    echo -e "${GREEN}◇ ${WHITE}${msg}${NC}"
     echo ""
     for i in "${!options[@]}"; do
         if [ "$i" -eq "$selected" ]; then
-            echo -e "  ${ORANGE}●${NC} ${WHITE}${options[$i]}${NC}"
+            echo -e "  ${GREEN}●${NC} ${WHITE}${options[$i]}${NC}"
         else
             echo -e "  ${DIM}○ ${options[$i]}${NC}"
         fi
@@ -73,9 +74,9 @@ oc_input() {
     local msg="$1" varname="$2" default="${3:-}"
     echo ""
     if [ -n "$default" ]; then
-        echo -e "${ORANGE}◇ ${WHITE}${msg}${NC} ${DIM}(mặc định: ${default})${NC}"
+        echo -e "${GREEN}◇ ${WHITE}${msg}${NC} ${DIM}(mặc định: ${default})${NC}"
     else
-        echo -e "${ORANGE}◇ ${WHITE}${msg}${NC}"
+        echo -e "${GREEN}◇ ${WHITE}${msg}${NC}"
     fi
     echo -ne "  "
     local val
@@ -88,7 +89,7 @@ oc_input() {
 show_step() {
     local step=$1 total=$2 title=$3 desc="${4:-}"
     echo ""
-    echo -e "${ORANGE}${BOLD}◆ ${title}${NC}  ${DIM}[${step}/${total}]${NC}"
+    echo -e "${GREEN}${BOLD}◆ ${title}${NC}  ${DIM}[${step}/${total}]${NC}"
     [ -n "$desc" ] && echo -e "  ${DIM}${desc}${NC}"
     echo ""
 }
@@ -108,7 +109,7 @@ _spin_animate() {
     local i=0
     while true; do
         local c="${_SPIN_CHARS:$((i % 10)):1}"
-        echo -ne "\r  ${ORANGE}${c}${NC}  ${title}..."
+        echo -ne "\r  ${GREEN}${c}${NC}  ${title}..."
         i=$((i + 1))
         sleep 0.1
     done

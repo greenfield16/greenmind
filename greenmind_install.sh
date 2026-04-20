@@ -60,7 +60,7 @@ LOCAL_IP=$(hostname -I | awk '{print $1}')
 PORT=$(grep GREENMIND_PORT "$CONFIG_FILE" 2>/dev/null | cut -d= -f2 || echo 8765)
 
 echo ""
-echo -e "${ORANGE}${BOLD}◆ Cài đặt hoàn tất!${NC}"
+echo -e "${GREEN}${BOLD}◆ Cài đặt hoàn tất!${NC}"
 echo -e "  ${DIM}│${NC}"
 if [ "${ROLE:-}" = "gateway" ]; then
 echo -e "  ${DIM}│${NC}  ${WHITE}Dashboard${NC}  http://${LOCAL_IP}:${PORT}"
