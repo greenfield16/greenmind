@@ -1,6 +1,6 @@
 #!/bin/bash
 # 🌿 03_gateway/01_packages.sh
-show_step 2 7 "Cài packages hệ thống"
+show_step 2 7 "Cài packages hệ thống" "Python, MQTT broker, FFmpeg, Git và các công cụ cần thiết"
 ask_continue
 
 apt-get update -q >> /tmp/greenmind_install.log 2>&1 || true

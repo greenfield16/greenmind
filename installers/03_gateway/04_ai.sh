@@ -1,6 +1,6 @@
 #!/bin/bash
 # 🌿 03_gateway/04_ai.sh — Cấu hình AI Engine
-show_step 5 7 "Cấu hình AI Engine"
+show_step 5 7 "Cấu hình AI Engine" "Chọn AI để phân tích camera, nhận diện sự kiện và trả lời lệnh"
 
 echo ""
 echo -e "  ${BOLD}Chọn AI Engine:${NC}"

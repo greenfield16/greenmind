@@ -1,6 +1,6 @@
 #!/bin/bash
 # 🌿 03_gateway/07_openclaw.sh — Cài OpenClaw AI Brain
-show_step 7 7 "Cài OpenClaw AI Brain"
+show_step 7 7 "Cài OpenClaw AI Brain" "Node.js runtime + OpenClaw — não AI xử lý ngôn ngữ tự nhiên qua Telegram"
 
 # ── Node.js ──────────────────────────────────────────────────
 if ! command -v node &>/dev/null; then

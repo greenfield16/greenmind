@@ -1,6 +1,6 @@
 #!/bin/bash
 # 🌿 04_node/01_packages.sh
-show_step 2 4 "Cài packages Node"
+show_step 2 4 "Cài packages Node" "Python, FFmpeg và các thư viện xử lý camera, cảm biến"
 ask_continue
 
 apt-get update -q >> /tmp/greenmind_install.log 2>&1 || true

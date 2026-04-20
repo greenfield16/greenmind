@@ -1,6 +1,6 @@
 #!/bin/bash
 # 🌿 04_node/02_modules.sh — Chọn modules
-show_progress 3 4 "Chọn modules"
+show_progress 3 4 "Chọn modules" "Chọn loại thiết bị sẽ kết nối: Camera, Cảm biến, Chấm công..."
 ask_continue
 
 echo -e "\n${BOLD}Chọn modules cần cài (nhập số, cách nhau bởi dấu phẩy):${NC}"

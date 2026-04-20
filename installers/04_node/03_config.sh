@@ -1,6 +1,6 @@
 #!/bin/bash
 # 🌿 04_node/03_config.sh
-show_progress 4 4 "Cấu hình Node"
+show_progress 4 4 "Cấu hình Node" "Nhập địa chỉ Gateway và Pairing Token để kết nối"
 ask_continue
 
 read -rp "Nhập Gateway URL (vd: http://178.128.91.69:8765): " GW_URL

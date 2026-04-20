@@ -1,6 +1,6 @@
 #!/bin/bash
 # 🌿 03_gateway/05_config.sh
-show_progress 6 6 "Cấu hình Gateway"
+show_progress 6 7 "Cấu hình Gateway" "Tải code Greenmind, thiết lập Telegram bot và các thông số hệ thống"
 ask_continue
 
 # Tạo thư mục
