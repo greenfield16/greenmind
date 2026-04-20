@@ -1,10 +1,11 @@
 #!/bin/bash
 # 🌿 03_gateway/02_mqtt.sh
-show_progress 3 6 "Cấu hình MQTT Broker"
+show_step 3 7 "Cấu hình MQTT Broker"
 ask_continue
 
-systemctl enable mosquitto --quiet
-systemctl restart mosquitto
+run_step "Kích hoạt Mosquitto MQTT" systemctl enable mosquitto
+run_step "Khởi động Mosquitto" systemctl restart mosquitto
+
 sleep 1
 if systemctl is-active --quiet mosquitto; then
     print_success "MQTT Broker đang chạy"

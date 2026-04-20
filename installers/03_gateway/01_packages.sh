@@ -1,8 +1,8 @@
 #!/bin/bash
 # 🌿 03_gateway/01_packages.sh
-show_progress 2 6 "Cài packages hệ thống"
+show_step 2 7 "Cài packages hệ thống"
 ask_continue
 
-apt-get update -q
-apt-get install -y python3 python3-pip python3-venv mosquitto mosquitto-clients ffmpeg curl git -q
+run_step "Cập nhật danh sách gói" apt-get update -q
+run_step "Cài Python, MQTT, FFmpeg" apt-get install -y python3 python3-pip python3-venv mosquitto mosquitto-clients ffmpeg curl git -q
 print_success "Packages đã cài xong"
