@@ -2,7 +2,7 @@
 # 🌿 01_env.sh — Banner + kiểm tra môi trường
 
 clear
-echo -e "${GREEN}${BOLD}"
+echo -e "${ORANGE}${BOLD}"
 echo "    ██████╗ ██████╗ ███████╗███████╗███╗   ██╗███╗   ███╗██╗███╗   ██╗██████╗ "
 echo "   ██╔════╝ ██╔══██╗██╔════╝██╔════╝████╗  ██║████╗ ████║██║████╗  ██║██╔══██╗"
 echo "   ██║  ███╗██████╔╝█████╗  █████╗  ██╔██╗ ██║██╔████╔██║██║██╔██╗ ██║██║  ██║"
@@ -10,8 +10,7 @@ echo "   ██║   ██║██╔══██╗██╔══╝  ██
 echo "   ╚██████╔╝██║  ██║███████╗███████╗██║ ╚████║██║ ╚═╝ ██║██║██║ ╚████║██████╔╝"
 echo "    ╚═════╝ ╚═╝  ╚═╝╚══════╝╚══════╝╚═╝  ╚═══╝╚═╝     ╚═╝╚═╝╚═╝  ╚═══╝╚═════╝ "
 echo -e "${NC}"
-echo -e "  ${CYAN}${BOLD}Smart Building AI Platform${NC}  ${DIM}v3.1 by Greenfield Tech${NC}"
-echo -e "  ${DIM}──────────────────────────────────────────────────${NC}"
+echo -e "  ${WHITE}Smart Building AI Platform${NC}  ${DIM}v3.1 by Greenfield Tech${NC}"
 echo ""
 
 # Kiểm tra root
@@ -31,20 +30,15 @@ RAM_MB=$(free -m | awk '/^Mem:/{print $2}')
 CPU_CORES=$(nproc)
 DISK_FREE=$(df -h / | awk 'NR==2{print $4}')
 OS_NAME=$(. /etc/os-release && echo "$PRETTY_NAME")
-HOST=$(hostname)
 
-echo -e "  ${BOLD}Thông tin hệ thống:${NC}"
-echo -e "  ${DIM}  OS      :${NC} $OS_NAME"
-echo -e "  ${DIM}  Host    :${NC} $HOST"
-echo -e "  ${DIM}  RAM     :${NC} ${RAM_MB}MB"
-echo -e "  ${DIM}  CPU     :${NC} ${CPU_CORES} cores"
-echo -e "  ${DIM}  Disk    :${NC} ${DISK_FREE} trống"
-echo ""
+oc_section "System" \
+    "OS      : $OS_NAME" \
+    "Host    : $(hostname)" \
+    "RAM     : ${RAM_MB}MB" \
+    "CPU     : ${CPU_CORES} cores" \
+    "Disk    : ${DISK_FREE} trống"
 
-# Check RAM
-if [ "$RAM_MB" -lt 512 ]; then
-    print_warn "RAM thấp (${RAM_MB}MB) — có thể ảnh hưởng hiệu suất"
-fi
+[ "$RAM_MB" -lt 512 ] && print_warn "RAM thấp (${RAM_MB}MB)"
 
 # Check internet
 if ! curl -fsSL --connect-timeout 5 https://github.com > /dev/null 2>&1; then

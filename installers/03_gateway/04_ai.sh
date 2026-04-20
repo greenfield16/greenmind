@@ -2,31 +2,29 @@
 # 🌿 03_gateway/04_ai.sh — Cấu hình AI Engine
 show_step 5 7 "Cấu hình AI Engine" "Chọn AI để phân tích camera, nhận diện sự kiện và trả lời lệnh"
 
-echo ""
-echo -e "  ${BOLD}Chọn AI Engine:${NC}"
-echo ""
-echo -e "  ${GREEN}${BOLD}  1) OpenRouter${NC}  ${GREEN}(Khuyên dùng)${NC}"
-echo -e "  ${DIM}              Free tier · Nhiều model · Không cần thẻ tín dụng${NC}"
-echo -e "  ${DIM}              → https://openrouter.ai/keys${NC}"
-echo ""
-echo -e "  ${CYAN}${BOLD}  2) Gemini${NC}      (Google AI Studio)"
-echo -e "  ${DIM}              Free tier · Cần Google account${NC}"
-echo -e "  ${DIM}              → https://aistudio.google.com/app/apikey${NC}"
-echo ""
-echo -e "  ${CYAN}${BOLD}  3) Ollama${NC}      (Local AI — không cần internet)"
-echo -e "  ${DIM}              Miễn phí · Cần RAM ≥ 4GB${NC}"
-echo ""
-read -rp "  Chọn [1/2/3, mặc định: 1]: " AI_CHOICE
+oc_section "AI Engine" \
+    "Greenmind cần AI để xử lý ngôn ngữ tự nhiên và phân tích hình ảnh." \
+    "" \
+    "  OpenRouter — Cloud AI, free tier, nhiều model, không cần thẻ tín dụng" \
+    "               → https://openrouter.ai/keys" \
+    "" \
+    "  Gemini     — Google AI Studio, free tier, cần Google account" \
+    "               → https://aistudio.google.com/app/apikey" \
+    "" \
+    "  Ollama     — AI local, miễn phí hoàn toàn, cần RAM ≥ 4GB, không cần internet"
+
+oc_radio "Chọn AI Engine" AI_CHOICE \
+    "OpenRouter  (Khuyên dùng — free, cloud)" \
+    "Gemini      (Google AI Studio — free)" \
+    "Ollama      (Local AI — không cần internet)"
 
 case "$AI_CHOICE" in
     2)
         write_config AI_ENGINE gemini
-        echo -ne "\n  ${BOLD}Nhập Gemini API Key${NC} (AIza...): "
-        read -r GEMINI_KEY
+        oc_input "Nhập Gemini API Key (AIza...)" GEMINI_KEY
         while [[ ! "$GEMINI_KEY" =~ ^AIza ]]; do
-            print_warn "Key không hợp lệ (phải bắt đầu bằng AIza)"
-            echo -ne "  ${BOLD}Nhập lại${NC}: "
-            read -r GEMINI_KEY
+            print_warn "Key không hợp lệ — phải bắt đầu bằng AIza"
+            oc_input "Nhập lại Gemini API Key" GEMINI_KEY
         done
         write_config GEMINI_KEY "$GEMINI_KEY"
         print_success "Đã cấu hình Gemini"
@@ -37,23 +35,19 @@ case "$AI_CHOICE" in
         if ! command -v ollama &>/dev/null; then
             run_step "Cài Ollama" bash -c "curl -fsSL https://ollama.ai/install.sh | sh"
         fi
-        write_config OLLAMA_MODEL moondream
-        run_step "Tải model moondream" ollama pull moondream
-        print_success "Đã cấu hình Ollama + moondream"
+        write_config OLLAMA_MODEL llama3.2:3b
+        run_step "Tải model llama3.2:3b" ollama pull llama3.2:3b
+        print_success "Đã cấu hình Ollama + llama3.2:3b"
         ;;
     *)
         write_config AI_ENGINE openrouter
         write_config OPENROUTER_MODEL "nvidia/nemotron-3-super-120b-a12b:free"
-        echo ""
-        echo -e "  ${DIM}Lấy API key tại: ${CYAN}https://openrouter.ai/keys${NC}"
-        echo -ne "  ${BOLD}Nhập OpenRouter API Key${NC} (sk-or-v1-...): "
-        read -r OR_KEY
+        oc_input "Nhập OpenRouter API Key (sk-or-v1-...)" OR_KEY
         while [[ ! "$OR_KEY" =~ ^sk-or-v1- ]]; do
-            print_warn "Key không hợp lệ (phải bắt đầu bằng sk-or-v1-)"
-            echo -ne "  ${BOLD}Nhập lại${NC}: "
-            read -r OR_KEY
+            print_warn "Key không hợp lệ — phải bắt đầu bằng sk-or-v1-"
+            oc_input "Nhập lại OpenRouter API Key" OR_KEY
         done
         write_config OPENROUTER_KEY "$OR_KEY"
-        print_success "Đã cấu hình OpenRouter (model: nemotron-3-super-120b)"
+        print_success "Đã cấu hình OpenRouter"
         ;;
 esac

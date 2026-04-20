@@ -55,22 +55,23 @@ else
     done
 fi
 
-# ── Summary box ──────────────────────────────────────────────
+# ── Summary (OpenClaw style) ─────────────────────────────────
 LOCAL_IP=$(hostname -I | awk '{print $1}')
 PORT=$(grep GREENMIND_PORT "$CONFIG_FILE" 2>/dev/null | cut -d= -f2 || echo 8765)
 
 echo ""
-echo -e "${GREEN}${BOLD}╔══════════════════════════════════════════════════╗${NC}"
-echo -e "${GREEN}${BOLD}║     🌿 Greenmind cài đặt thành công!             ║${NC}"
-echo -e "${GREEN}${BOLD}╠══════════════════════════════════════════════════╣${NC}"
+echo -e "${ORANGE}${BOLD}◆ Cài đặt hoàn tất!${NC}"
+echo -e "  ${DIM}│${NC}"
 if [ "${ROLE:-}" = "gateway" ]; then
-echo -e "${GREEN}${BOLD}║${NC}  Dashboard : ${CYAN}http://${LOCAL_IP}:${PORT}${NC}"
-echo -e "${GREEN}${BOLD}║${NC}  Config    : ${CYAN}${CONFIG_FILE}${NC}"
-echo -e "${GREEN}${BOLD}║${NC}  Logs GW   : ${CYAN}journalctl -u greenmind-gateway -f${NC}"
-echo -e "${GREEN}${BOLD}║${NC}  Logs AI   : ${CYAN}journalctl --user -u openclaw-gateway -f${NC}"
+echo -e "  ${DIM}│${NC}  ${WHITE}Dashboard${NC}  http://${LOCAL_IP}:${PORT}"
+echo -e "  ${DIM}│${NC}  ${WHITE}Config${NC}     ${CONFIG_FILE}"
+echo -e "  ${DIM}│${NC}"
+echo -e "  ${DIM}│${NC}  ${DIM}Logs Gateway :${NC} journalctl -u greenmind-gateway -f"
+echo -e "  ${DIM}│${NC}  ${DIM}Logs AI      :${NC} journalctl --user -u openclaw-gateway -f"
 else
-echo -e "${GREEN}${BOLD}║${NC}  Config    : ${CYAN}${CONFIG_FILE}${NC}"
-echo -e "${GREEN}${BOLD}║${NC}  Logs      : ${CYAN}journalctl -u greenmind-node -f${NC}"
+echo -e "  ${DIM}│${NC}  ${WHITE}Config${NC}  ${CONFIG_FILE}"
+echo -e "  ${DIM}│${NC}"
+echo -e "  ${DIM}│${NC}  ${DIM}Logs :${NC} journalctl -u greenmind-node -f"
 fi
-echo -e "${GREEN}${BOLD}╚══════════════════════════════════════════════════╝${NC}"
+echo -e "  ${DIM}│${NC}"
 echo ""
