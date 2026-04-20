@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 🌿 Greenmind v3.0 — AI Engine
-Support: openrouter | gemini | ollama
+Support: nvidia | openrouter | gemini | ollama
 """
 
 import os, base64, requests, logging
@@ -46,7 +46,9 @@ def analyze_image(image_bytes: bytes, context: str = 'security') -> str:
     small = _resize(image_bytes)
     b64 = base64.b64encode(small).decode()
 
-    if engine == 'openrouter':
+    if engine == 'nvidia':
+        return _nvidia_image(cfg, b64, prompt)
+    elif engine == 'openrouter':
         return _openrouter_image(cfg, b64, prompt)
     elif engine == 'gemini':
         return _gemini_image(cfg, small, prompt)
@@ -62,12 +64,56 @@ def analyze_event(event_type: str, payload: dict, device_name: str) -> str:
         f"Thiết bị '{device_name}' ghi nhận sự kiện '{event_type}': {payload}. "
         f"Nhận xét ngắn gọn (1 câu) có gì bất thường không. Trả lời tiếng Việt."
     )
-    if engine == 'openrouter':
+    if engine == 'nvidia':
+        return _nvidia_text(cfg, prompt)
+    elif engine == 'openrouter':
         return _openrouter_text(cfg, prompt)
     elif engine == 'gemini':
         return _gemini_text(cfg, prompt)
     elif engine == 'ollama':
         return _ollama_text(cfg, prompt)
+    return ''
+
+# ── NVIDIA NIM ──────────────────────────────────────────────
+
+def _nvidia_image(cfg, b64: str, prompt: str) -> str:
+    key = cfg.get('NVIDIA_KEY', '')
+    model = cfg.get('NVIDIA_MODEL', 'nvidia/llama-3.2-90b-vision-instruct')
+    if not key:
+        return '⚠️ Chưa cấu hình NVIDIA_KEY.'
+    try:
+        resp = requests.post(
+            'https://integrate.api.nvidia.com/v1/chat/completions',
+            headers={'Authorization': f'Bearer {key}', 'Content-Type': 'application/json'},
+            json={'model': model, 'max_tokens': 512, 'messages': [{'role': 'user', 'content': [
+                {'type': 'text', 'text': prompt},
+                {'type': 'image_url', 'image_url': {'url': f'data:image/jpeg;base64,{b64}'}}
+            ]}]},
+            timeout=60
+        )
+        if resp.status_code == 200:
+            return resp.json()['choices'][0]['message']['content'].strip()
+        return f'⚠️ NVIDIA {resp.status_code}: {resp.text[:100]}'
+    except Exception as e:
+        return f'⚠️ NVIDIA lỗi: {str(e)[:100]}'
+
+def _nvidia_text(cfg, prompt: str) -> str:
+    key = cfg.get('NVIDIA_KEY', '')
+    model = cfg.get('NVIDIA_TEXT_MODEL', 'meta/llama-3.1-70b-instruct')
+    if not key:
+        return ''
+    try:
+        resp = requests.post(
+            'https://integrate.api.nvidia.com/v1/chat/completions',
+            headers={'Authorization': f'Bearer {key}', 'Content-Type': 'application/json'},
+            json={'model': model, 'max_tokens': 256,
+                  'messages': [{'role': 'user', 'content': prompt}]},
+            timeout=30
+        )
+        if resp.status_code == 200:
+            return resp.json()['choices'][0]['message']['content'].strip()
+    except Exception as e:
+        log.error(f'NVIDIA text: {e}')
     return ''
 
 # ── OpenRouter ──────────────────────────────────────────────
