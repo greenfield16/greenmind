@@ -3,6 +3,8 @@
 show_step 2 7 "Cài packages hệ thống"
 ask_continue
 
-run_step "Cập nhật danh sách gói" bash -c "apt-get update -q || true"
+apt-get update -q >> /tmp/greenmind_install.log 2>&1 || true
+print_success "Đã cập nhật danh sách gói"
+
 run_step "Cài Python, MQTT, FFmpeg" apt-get install -y python3 python3-pip python3-venv mosquitto mosquitto-clients ffmpeg curl git -q
 print_success "Packages đã cài xong"
