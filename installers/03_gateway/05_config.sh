@@ -1,6 +1,6 @@
 #!/bin/bash
 # 🌿 03_gateway/05_config.sh
-show_progress 6 7 "Cấu hình Gateway" "Tải code Greenmind, thiết lập Telegram bot và các thông số hệ thống"
+show_step 5 6 "Cấu hình Gateway" "Tải code Greenmind, thiết lập Telegram bot và các thông số hệ thống"
 
 # Tạo thư mục
 mkdir -p /var/lib/greenmind /tmp/greenmind_snaps "$INSTALL_DIR"

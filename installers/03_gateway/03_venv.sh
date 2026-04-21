@@ -1,6 +1,6 @@
 #!/bin/bash
 # 🌿 03_gateway/03_venv.sh
-show_step 4 7 "Cài Python environment" "Tạo môi trường Python độc lập, cài FastAPI và các thư viện cần thiết"
+show_step 4 6 "Cài Python environment" "Tạo môi trường Python độc lập, cài FastAPI và các thư viện cần thiết"
 ask_continue
 
 mkdir -p "$INSTALL_DIR"

@@ -1,6 +1,6 @@
 #!/bin/bash
 # 🌿 03_gateway/02_mqtt.sh
-show_step 3 7 "Cấu hình MQTT Broker" "Mosquitto — kênh giao tiếp giữa Gateway và các Node thiết bị"
+show_step 3 6 "Cấu hình MQTT Broker" "Mosquitto — kênh giao tiếp giữa Gateway và các Node thiết bị"
 ask_continue
 
 run_step "Kích hoạt Mosquitto MQTT" systemctl enable mosquitto

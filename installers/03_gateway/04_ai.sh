@@ -1,9 +1,12 @@
 #!/bin/bash
 # 🌿 03_gateway/04_ai.sh — Cấu hình AI Engine
-show_step 5 7 "Cấu hình AI Engine" "Chọn AI để phân tích camera, nhận diện sự kiện và trả lời lệnh"
+show_step 4 6 "Cấu hình AI Engine" "Chọn AI để phân tích camera, nhận diện sự kiện và chat tự nhiên"
 
 oc_section "AI Engine" \
     "Greenmind cần AI để xử lý ngôn ngữ tự nhiên và phân tích hình ảnh." \
+    "" \
+    "  DO Agent   — DigitalOcean GenAI, nhiều model mạnh, cần $5 credit" \
+    "               → https://cloud.digitalocean.com/gradient-ai-platform" \
     "" \
     "  OpenRouter — Cloud AI, free tier, nhiều model, không cần thẻ tín dụng" \
     "               → https://openrouter.ai/keys" \
@@ -14,12 +17,39 @@ oc_section "AI Engine" \
     "  Ollama     — AI local, miễn phí hoàn toàn, cần RAM ≥ 4GB, không cần internet"
 
 oc_radio "Chọn AI Engine" AI_CHOICE \
-    "OpenRouter  (Khuyên dùng — free, cloud)" \
+    "DO Agent    (Khuyên dùng — DigitalOcean GenAI)" \
+    "OpenRouter  (Free cloud AI)" \
     "Gemini      (Google AI Studio — free)" \
     "Ollama      (Local AI — không cần internet)"
 
 case "$AI_CHOICE" in
+    1)
+        write_config AI_ENGINE do_agent
+        oc_input "Nhập DO Agent Endpoint (https://xxxx.agents.do-ai.run)" DO_AGENT_ENDPOINT
+        write_config DO_AGENT_ENDPOINT "$DO_AGENT_ENDPOINT"
+        oc_input "Nhập DO Agent API Key" DO_AGENT_KEY
+        write_config DO_AGENT_KEY "$DO_AGENT_KEY"
+        # OpenRouter key tùy chọn để phân tích ảnh camera (DO Agent không có vision)
+        oc_confirm "Thêm OpenRouter key để phân tích ảnh camera? (tuỳ chọn)" && {
+            oc_input "Nhập OpenRouter API Key (sk-or-v1-...)" OR_KEY
+            write_config OPENROUTER_KEY "$OR_KEY"
+            write_config OPENROUTER_MODEL "nvidia/nemotron-nano-12b-v2-vl:free"
+            print_success "Đã cấu hình OpenRouter cho vision"
+        }
+        print_success "Đã cấu hình DO Agent"
+        ;;
     2)
+        write_config AI_ENGINE openrouter
+        write_config OPENROUTER_MODEL "nvidia/nemotron-3-super-120b-a12b:free"
+        oc_input "Nhập OpenRouter API Key (sk-or-v1-...)" OR_KEY
+        while [[ ! "$OR_KEY" =~ ^sk-or-v1- ]]; do
+            print_warn "Key không hợp lệ — phải bắt đầu bằng sk-or-v1-"
+            oc_input "Nhập lại OpenRouter API Key" OR_KEY
+        done
+        write_config OPENROUTER_KEY "$OR_KEY"
+        print_success "Đã cấu hình OpenRouter"
+        ;;
+    3)
         write_config AI_ENGINE gemini
         oc_input "Nhập Gemini API Key (AIza...)" GEMINI_KEY
         while [[ ! "$GEMINI_KEY" =~ ^AIza ]]; do
@@ -29,7 +59,7 @@ case "$AI_CHOICE" in
         write_config GEMINI_KEY "$GEMINI_KEY"
         print_success "Đã cấu hình Gemini"
         ;;
-    3)
+    4)
         write_config AI_ENGINE ollama
         write_config OLLAMA_URL http://localhost:11434
         if ! command -v ollama &>/dev/null; then
@@ -43,10 +73,6 @@ case "$AI_CHOICE" in
         write_config AI_ENGINE openrouter
         write_config OPENROUTER_MODEL "nvidia/nemotron-3-super-120b-a12b:free"
         oc_input "Nhập OpenRouter API Key (sk-or-v1-...)" OR_KEY
-        while [[ ! "$OR_KEY" =~ ^sk-or-v1- ]]; do
-            print_warn "Key không hợp lệ — phải bắt đầu bằng sk-or-v1-"
-            oc_input "Nhập lại OpenRouter API Key" OR_KEY
-        done
         write_config OPENROUTER_KEY "$OR_KEY"
         print_success "Đã cấu hình OpenRouter"
         ;;
