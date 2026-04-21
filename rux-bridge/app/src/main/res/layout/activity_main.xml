@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:gravity="center"
+    android:padding="32dp"
+    android:background="#1a1a1a">
+
+    <TextView
+        android:id="@+id/tvStatus"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="🌿 Greenmind Bridge\nKhởi động..."
+        android:textColor="#4CAF50"
+        android:textSize="20sp"
+        android:gravity="center"
+        android:fontFamily="monospace"
+        android:layout_marginBottom="32dp"/>
+
+    <Button
+        android:id="@+id/btnSpeak"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Restart Bridge"
+        android:backgroundTint="#4CAF50"/>
+
+</LinearLayout>
