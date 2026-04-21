@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 🌿 Greenmind v3.0 — AI Engine
-Support: nvidia | openrouter | gemini | ollama
+Support: nvidia | openrouter | gemini | ollama | do_agent
 """
 
 import os, base64, requests, logging
@@ -54,6 +54,8 @@ def analyze_image(image_bytes: bytes, context: str = 'security') -> str:
         return _gemini_image(cfg, small, prompt)
     elif engine == 'ollama':
         return _ollama_image(cfg, b64, prompt)
+    elif engine == 'do_agent':
+        return _do_agent_image(cfg, b64, prompt)
     return '⚠️ Chưa cấu hình AI engine.'
 
 def analyze_event(event_type: str, payload: dict, device_name: str) -> str:
@@ -72,6 +74,8 @@ def analyze_event(event_type: str, payload: dict, device_name: str) -> str:
         return _gemini_text(cfg, prompt)
     elif engine == 'ollama':
         return _ollama_text(cfg, prompt)
+    elif engine == 'do_agent':
+        return _do_agent_text(cfg, prompt)
     return ''
 
 # ── NVIDIA NIM ──────────────────────────────────────────────
@@ -214,3 +218,32 @@ def _ollama_text(cfg, prompt: str) -> str:
     except Exception as e:
         log.error(f'Ollama text: {e}')
     return ''
+
+# ── DigitalOcean GenAI Agent ─────────────────────────────────
+
+def _do_agent_image(cfg, b64: str, prompt: str) -> str:
+    """DO GenAI Agent — text only (Llama 3.3 70B không hỗ trợ vision)."""
+    # DO Agent hiện chưa support vision, fallback về text mô tả
+    return _do_agent_text(cfg, prompt + " (không có ảnh đính kèm)")
+
+def _do_agent_text(cfg, prompt: str) -> str:
+    endpoint = cfg.get('DO_AGENT_ENDPOINT', '')
+    key = cfg.get('DO_AGENT_KEY', '')
+    if not endpoint or not key:
+        return '⚠️ Chưa cấu hình DO_AGENT_ENDPOINT hoặc DO_AGENT_KEY.'
+    try:
+        resp = requests.post(
+            f'{endpoint}/api/v1/chat/completions',
+            headers={'Authorization': f'Bearer {key}', 'Content-Type': 'application/json'},
+            json={
+                'messages': [{'role': 'user', 'content': prompt}],
+                'stream': False,
+                'max_tokens': 256
+            },
+            timeout=30
+        )
+        if resp.status_code == 200:
+            return resp.json()['choices'][0]['message']['content'].strip()
+        return f'⚠️ DO Agent {resp.status_code}: {resp.text[:100]}'
+    except Exception as e:
+        return f'⚠️ DO Agent lỗi: {str(e)[:100]}'
