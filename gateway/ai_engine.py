@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-🌿 Greenmind v3.0 — AI Engine
+🌿 Greenmind v3.1 — AI Engine
 Support: nvidia | openrouter | gemini | ollama | do_agent
 """
 
@@ -10,7 +10,6 @@ from io import BytesIO
 log = logging.getLogger(__name__)
 
 def _resize(image_bytes: bytes, max_width: int = 640) -> bytes:
-    """Resize ảnh xuống max_width để giảm tải AI."""
     try:
         from PIL import Image
         img = Image.open(BytesIO(image_bytes))
@@ -36,7 +35,6 @@ def _load_config():
     return cfg
 
 def analyze_image(image_bytes: bytes, context: str = 'security') -> str:
-    """Phân tích ảnh camera, trả về mô tả tiếng Việt."""
     cfg = _load_config()
     engine = cfg.get('AI_ENGINE', 'openrouter')
     prompt = (
@@ -55,11 +53,13 @@ def analyze_image(image_bytes: bytes, context: str = 'security') -> str:
     elif engine == 'ollama':
         return _ollama_image(cfg, b64, prompt)
     elif engine == 'do_agent':
-        return _do_agent_image(cfg, b64, prompt)
+        # DO Agent không có vision → dùng openrouter fallback nếu có key
+        if cfg.get('OPENROUTER_KEY'):
+            return _openrouter_image(cfg, b64, prompt)
+        return _do_agent_text(cfg, prompt + " (không có ảnh)")
     return '⚠️ Chưa cấu hình AI engine.'
 
 def analyze_event(event_type: str, payload: dict, device_name: str) -> str:
-    """Phân tích sự kiện không có ảnh (checkin, sensor...), trả về nhận xét tiếng Việt."""
     cfg = _load_config()
     engine = cfg.get('AI_ENGINE', 'openrouter')
     prompt = (
@@ -76,6 +76,130 @@ def analyze_event(event_type: str, payload: dict, device_name: str) -> str:
         return _ollama_text(cfg, prompt)
     elif engine == 'do_agent':
         return _do_agent_text(cfg, prompt)
+    return ''
+
+def chat(user_message: str, history: list = None, system_context: str = '') -> str:
+    """Chat tự nhiên với AI — dùng cho Telegram bot chat mode."""
+    cfg = _load_config()
+    engine = cfg.get('AI_ENGINE', 'openrouter')
+    system = (
+        "Bạn là Greenmind, hệ thống AI giám sát nhà thông minh. "
+        "Trả lời ngắn gọn bằng tiếng Việt. "
+        "Bạn có thể trả lời về tình trạng camera, thiết bị, sự kiện trong nhà. "
+    )
+    if system_context:
+        system += f"\nDữ liệu hệ thống hiện tại:\n{system_context}"
+
+    messages = [{'role': 'system', 'content': system}]
+    if history:
+        messages.extend(history[-10:])  # Giữ 10 tin nhắn gần nhất
+    messages.append({'role': 'user', 'content': user_message})
+
+    if engine == 'do_agent':
+        return _do_agent_chat(cfg, messages)
+    elif engine == 'openrouter':
+        return _openrouter_chat(cfg, messages)
+    elif engine == 'ollama':
+        return _ollama_chat(cfg, messages)
+    elif engine == 'gemini':
+        return _gemini_text(cfg, user_message)
+    return '⚠️ Chưa cấu hình AI engine.'
+
+# ── DigitalOcean GenAI Agent ─────────────────────────────────
+
+def _do_agent_text(cfg, prompt: str) -> str:
+    endpoint = cfg.get('DO_AGENT_ENDPOINT', '')
+    key = cfg.get('DO_AGENT_KEY', '')
+    if not endpoint or not key:
+        return '⚠️ Chưa cấu hình DO_AGENT_ENDPOINT hoặc DO_AGENT_KEY.'
+    try:
+        resp = requests.post(
+            f'{endpoint}/api/v1/chat/completions',
+            headers={'Authorization': f'Bearer {key}', 'Content-Type': 'application/json'},
+            json={'messages': [{'role': 'user', 'content': prompt}], 'stream': False, 'max_tokens': 256},
+            timeout=30
+        )
+        if resp.status_code == 200:
+            return resp.json()['choices'][0]['message']['content'].strip()
+        return f'⚠️ DO Agent {resp.status_code}: {resp.text[:100]}'
+    except Exception as e:
+        return f'⚠️ DO Agent lỗi: {str(e)[:100]}'
+
+def _do_agent_chat(cfg, messages: list) -> str:
+    endpoint = cfg.get('DO_AGENT_ENDPOINT', '')
+    key = cfg.get('DO_AGENT_KEY', '')
+    if not endpoint or not key:
+        return '⚠️ Chưa cấu hình DO_AGENT_ENDPOINT hoặc DO_AGENT_KEY.'
+    try:
+        resp = requests.post(
+            f'{endpoint}/api/v1/chat/completions',
+            headers={'Authorization': f'Bearer {key}', 'Content-Type': 'application/json'},
+            json={'messages': messages, 'stream': False, 'max_tokens': 512},
+            timeout=30
+        )
+        if resp.status_code == 200:
+            return resp.json()['choices'][0]['message']['content'].strip()
+        return f'⚠️ DO Agent {resp.status_code}: {resp.text[:100]}'
+    except Exception as e:
+        return f'⚠️ DO Agent lỗi: {str(e)[:100]}'
+
+# ── OpenRouter ──────────────────────────────────────────────
+
+def _openrouter_image(cfg, b64: str, prompt: str) -> str:
+    key = cfg.get('OPENROUTER_KEY', '')
+    model = cfg.get('OPENROUTER_MODEL', 'nvidia/nemotron-nano-12b-v2-vl:free')
+    if not key:
+        return '⚠️ Chưa cấu hình OPENROUTER_KEY.'
+    try:
+        resp = requests.post(
+            'https://openrouter.ai/api/v1/chat/completions',
+            headers={'Authorization': f'Bearer {key}', 'Content-Type': 'application/json'},
+            json={'model': model, 'messages': [{'role': 'user', 'content': [
+                {'type': 'text', 'text': prompt},
+                {'type': 'image_url', 'image_url': {'url': f'data:image/jpeg;base64,{b64}'}}
+            ]}]},
+            timeout=60
+        )
+        if resp.status_code == 200:
+            return resp.json()['choices'][0]['message']['content'].strip()
+        return f'⚠️ OpenRouter {resp.status_code}: {resp.text[:100]}'
+    except Exception as e:
+        return f'⚠️ OpenRouter lỗi: {str(e)[:100]}'
+
+def _openrouter_text(cfg, prompt: str) -> str:
+    key = cfg.get('OPENROUTER_KEY', '')
+    model = cfg.get('OPENROUTER_MODEL', 'nvidia/nemotron-nano-12b-v2-vl:free')
+    if not key:
+        return ''
+    try:
+        resp = requests.post(
+            'https://openrouter.ai/api/v1/chat/completions',
+            headers={'Authorization': f'Bearer {key}', 'Content-Type': 'application/json'},
+            json={'model': model, 'messages': [{'role': 'user', 'content': prompt}]},
+            timeout=30
+        )
+        if resp.status_code == 200:
+            return resp.json()['choices'][0]['message']['content'].strip()
+    except Exception as e:
+        log.error(f'OpenRouter text: {e}')
+    return ''
+
+def _openrouter_chat(cfg, messages: list) -> str:
+    key = cfg.get('OPENROUTER_KEY', '')
+    model = cfg.get('OPENROUTER_MODEL', 'nvidia/nemotron-nano-12b-v2-vl:free')
+    if not key:
+        return '⚠️ Chưa cấu hình OPENROUTER_KEY.'
+    try:
+        resp = requests.post(
+            'https://openrouter.ai/api/v1/chat/completions',
+            headers={'Authorization': f'Bearer {key}', 'Content-Type': 'application/json'},
+            json={'model': model, 'messages': messages, 'max_tokens': 512},
+            timeout=30
+        )
+        if resp.status_code == 200:
+            return resp.json()['choices'][0]['message']['content'].strip()
+    except Exception as e:
+        log.error(f'OpenRouter chat: {e}')
     return ''
 
 # ── NVIDIA NIM ──────────────────────────────────────────────
@@ -118,47 +242,6 @@ def _nvidia_text(cfg, prompt: str) -> str:
             return resp.json()['choices'][0]['message']['content'].strip()
     except Exception as e:
         log.error(f'NVIDIA text: {e}')
-    return ''
-
-# ── OpenRouter ──────────────────────────────────────────────
-
-def _openrouter_image(cfg, b64: str, prompt: str) -> str:
-    key = cfg.get('OPENROUTER_KEY', '')
-    model = cfg.get('OPENROUTER_MODEL', 'nvidia/nemotron-nano-12b-v2-vl:free')
-    if not key:
-        return '⚠️ Chưa cấu hình OPENROUTER_KEY.'
-    try:
-        resp = requests.post(
-            'https://openrouter.ai/api/v1/chat/completions',
-            headers={'Authorization': f'Bearer {key}', 'Content-Type': 'application/json'},
-            json={'model': model, 'messages': [{'role': 'user', 'content': [
-                {'type': 'text', 'text': prompt},
-                {'type': 'image_url', 'image_url': {'url': f'data:image/jpeg;base64,{b64}'}}
-            ]}]},
-            timeout=60
-        )
-        if resp.status_code == 200:
-            return resp.json()['choices'][0]['message']['content'].strip()
-        return f'⚠️ OpenRouter {resp.status_code}: {resp.text[:100]}'
-    except Exception as e:
-        return f'⚠️ OpenRouter lỗi: {str(e)[:100]}'
-
-def _openrouter_text(cfg, prompt: str) -> str:
-    key = cfg.get('OPENROUTER_KEY', '')
-    model = cfg.get('OPENROUTER_MODEL', 'nvidia/nemotron-nano-12b-v2-vl:free')
-    if not key:
-        return ''
-    try:
-        resp = requests.post(
-            'https://openrouter.ai/api/v1/chat/completions',
-            headers={'Authorization': f'Bearer {key}', 'Content-Type': 'application/json'},
-            json={'model': model, 'messages': [{'role': 'user', 'content': prompt}]},
-            timeout=30
-        )
-        if resp.status_code == 200:
-            return resp.json()['choices'][0]['message']['content'].strip()
-    except Exception as e:
-        log.error(f'OpenRouter text: {e}')
     return ''
 
 # ── Gemini ──────────────────────────────────────────────────
@@ -219,31 +302,15 @@ def _ollama_text(cfg, prompt: str) -> str:
         log.error(f'Ollama text: {e}')
     return ''
 
-# ── DigitalOcean GenAI Agent ─────────────────────────────────
-
-def _do_agent_image(cfg, b64: str, prompt: str) -> str:
-    """DO GenAI Agent — text only (Llama 3.3 70B không hỗ trợ vision)."""
-    # DO Agent hiện chưa support vision, fallback về text mô tả
-    return _do_agent_text(cfg, prompt + " (không có ảnh đính kèm)")
-
-def _do_agent_text(cfg, prompt: str) -> str:
-    endpoint = cfg.get('DO_AGENT_ENDPOINT', '')
-    key = cfg.get('DO_AGENT_KEY', '')
-    if not endpoint or not key:
-        return '⚠️ Chưa cấu hình DO_AGENT_ENDPOINT hoặc DO_AGENT_KEY.'
+def _ollama_chat(cfg, messages: list) -> str:
+    url = cfg.get('OLLAMA_URL', 'http://localhost:11434')
+    model = cfg.get('OLLAMA_MODEL', 'gemma3:1b')
     try:
-        resp = requests.post(
-            f'{endpoint}/api/v1/chat/completions',
-            headers={'Authorization': f'Bearer {key}', 'Content-Type': 'application/json'},
-            json={
-                'messages': [{'role': 'user', 'content': prompt}],
-                'stream': False,
-                'max_tokens': 256
-            },
-            timeout=30
-        )
+        resp = requests.post(f'{url}/api/chat',
+            json={'model': model, 'messages': messages, 'stream': False},
+            timeout=60)
         if resp.status_code == 200:
-            return resp.json()['choices'][0]['message']['content'].strip()
-        return f'⚠️ DO Agent {resp.status_code}: {resp.text[:100]}'
+            return resp.json().get('message', {}).get('content', '').strip()
     except Exception as e:
-        return f'⚠️ DO Agent lỗi: {str(e)[:100]}'
+        log.error(f'Ollama chat: {e}')
+    return ''

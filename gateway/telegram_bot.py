@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-🌿 Greenmind v3.0 — Telegram Bot
-Long-polling, requests thuần (không dùng python-telegram-bot)
+🌿 Greenmind v3.1 — Telegram Bot
+Hỗ trợ: commands + chat AI tự nhiên + proactive alerts
 """
 
 import os, time, logging, requests, json
@@ -11,7 +11,9 @@ from pathlib import Path
 log = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
 
-SNAP_DIR = Path('/tmp/greenmind_snaps')
+SNAP_DIR  = Path('/tmp/greenmind_snaps')
+# Memory chat mỗi user: {chat_id: [{"role": "user/assistant", "content": "..."}]}
+_chat_history = {}
 
 def load_config():
     cfg = {}
@@ -26,15 +28,17 @@ def load_config():
     return cfg
 
 def send_message(token, chat_id, text, photo_path=None):
-    """Gửi text hoặc ảnh kèm caption."""
     if photo_path and Path(photo_path).exists():
         with open(photo_path, 'rb') as f:
             requests.post(f'https://api.telegram.org/bot{token}/sendPhoto',
-                data={'chat_id': chat_id, 'caption': text, 'parse_mode': 'Markdown'},
+                data={'chat_id': chat_id, 'caption': text[:1024], 'parse_mode': 'Markdown'},
                 files={'photo': f}, timeout=15)
     else:
-        requests.post(f'https://api.telegram.org/bot{token}/sendMessage',
-            json={'chat_id': chat_id, 'text': text, 'parse_mode': 'Markdown'}, timeout=10)
+        # Chia nhỏ nếu quá dài
+        for i in range(0, len(text), 4096):
+            requests.post(f'https://api.telegram.org/bot{token}/sendMessage',
+                json={'chat_id': chat_id, 'text': text[i:i+4096], 'parse_mode': 'Markdown'},
+                timeout=10)
 
 def get_gateway_data(endpoint, params=None):
     cfg = load_config()
@@ -45,6 +49,23 @@ def get_gateway_data(endpoint, params=None):
     except Exception:
         return {}
 
+def build_system_context():
+    """Lấy dữ liệu hệ thống để cung cấp cho AI."""
+    try:
+        devices = get_gateway_data('/api/devices') or []
+        events = get_gateway_data('/api/events', {'limit': 10}) or []
+        online = [d for d in devices if d.get('status') == 'online']
+        lines = [f"Thiết bị online ({len(online)}/{len(devices)}):"]
+        for d in online[:5]:
+            lines.append(f"- {d.get('name', d['id'])} ({d.get('type','')})")
+        lines.append(f"\n{len(events)} sự kiện gần nhất:")
+        for e in events[:5]:
+            ts_str = datetime.fromtimestamp(e.get('ts', 0)).strftime('%H:%M %d/%m')
+            lines.append(f"- [{ts_str}] {e.get('type','')} tại {e.get('device_name','?')}: {(e.get('ai_analysis') or '')[:80]}")
+        return '\n'.join(lines)
+    except Exception:
+        return ''
+
 def handle_command(token, chat_id, text):
     cfg = load_config()
     parts = text.strip().split()
@@ -52,13 +73,15 @@ def handle_command(token, chat_id, text):
 
     if cmd == '/start':
         msg = (
-            "🌿 *Greenmind v3.0* — Smart Building AI\n\n"
+            "🌿 *Greenmind v3.1* — Smart Building AI\n\n"
             "Các lệnh:\n"
             "/status — Trạng thái hệ thống\n"
             "/devices — Danh sách thiết bị\n"
             "/snap <id> — Chụp ảnh + AI\n"
             "/events [n] — Sự kiện gần nhất\n"
-            "/report — Báo cáo hôm nay"
+            "/report — Báo cáo hôm nay\n"
+            "/clear — Xoá lịch sử chat\n\n"
+            "💬 Hoặc nhắn tin tự nhiên để chat với AI!"
         )
         send_message(token, chat_id, msg)
 
@@ -95,7 +118,7 @@ def handle_command(token, chat_id, text):
         if not snap_path.exists():
             send_message(token, chat_id, f'❌ Không có ảnh cho `{device_id}`')
             return
-        send_message(token, chat_id, '📷 Đang phân tích...', None)
+        send_message(token, chat_id, '📷 Đang phân tích...')
         from ai_engine import analyze_image
         with open(snap_path, 'rb') as f:
             analysis = analyze_image(f.read())
@@ -129,8 +152,43 @@ def handle_command(token, chat_id, text):
         )
         send_message(token, chat_id, msg)
 
+    elif cmd == '/clear':
+        _chat_history[chat_id] = []
+        send_message(token, chat_id, '🗑 Đã xoá lịch sử chat.')
+
     else:
-        send_message(token, chat_id, f'❓ Lệnh không hợp lệ. Dùng /start để xem hướng dẫn.')
+        # Không phải command → chat AI tự nhiên
+        handle_chat(token, chat_id, text)
+
+def handle_chat(token, chat_id, user_text):
+    """Xử lý chat tự nhiên với AI."""
+    from ai_engine import chat as ai_chat
+
+    # Gửi typing indicator
+    try:
+        cfg = load_config()
+        requests.post(
+            f'https://api.telegram.org/bot{cfg.get("TELEGRAM_TOKEN","")}/sendChatAction',
+            json={'chat_id': chat_id, 'action': 'typing'}, timeout=5
+        )
+    except Exception:
+        pass
+
+    # Lấy history
+    history = _chat_history.get(chat_id, [])
+
+    # Build context hệ thống
+    context = build_system_context()
+
+    # Gọi AI
+    reply = ai_chat(user_text, history=history, system_context=context)
+
+    # Cập nhật history
+    history.append({'role': 'user', 'content': user_text})
+    history.append({'role': 'assistant', 'content': reply})
+    _chat_history[chat_id] = history[-20:]  # Giữ 20 tin nhắn gần nhất
+
+    send_message(token, chat_id, reply)
 
 def main():
     cfg = load_config()
@@ -140,7 +198,7 @@ def main():
         log.error('❌ Chưa cấu hình TELEGRAM_TOKEN')
         return
 
-    log.info('🌿 Greenmind Telegram Bot khởi động...')
+    log.info('🌿 Greenmind Telegram Bot v3.1 khởi động...')
     SNAP_DIR.mkdir(exist_ok=True)
     offset = 0
 
@@ -155,7 +213,6 @@ def main():
                 if not msg or 'text' not in msg:
                     continue
                 cid = str(msg['chat']['id'])
-                # Chỉ xử lý từ chat_id được cấu hình
                 if chat_id and cid != str(chat_id):
                     continue
                 handle_command(token, cid, msg['text'])
